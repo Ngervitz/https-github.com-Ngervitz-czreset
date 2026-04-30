@@ -1,779 +1,543 @@
-const PRE_LOADED = {
-nombre: “Martín Rodríguez”,
-email: “martin@email.com”,
-dni: “32.456.789”,
-ingresoMensual: 450000,
-situacionLaboral: “relacion_dependencia”,
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Credizona Reset — Diagnóstico Financiero</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{background:#0D0F14;min-height:100vh;}
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
+input[type=range]{height:4px;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:#0D0F14;}
+::-webkit-scrollbar-thumb{background:#1E2330;border-radius:4px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+// ── DATOS PRE-CARGADOS (reemplazar con parámetros reales de URL) ──────────
+function getPreLoaded() {
+const p = new URLSearchParams(window.location.search);
+return {
+nombre: p.get("nombre") || "Martín Rodríguez",
+email: p.get("email") || "martin@email.com",
+dni: p.get("dni") || "32.456.789",
+ingresoMensual: parseFloat(p.get("ingreso")) || 450000,
+situacionLaboral: p.get("laboral") || "relacion_dependencia",
 };
+}
+const PRE_LOADED = getPreLoaded();
 
 const SITUACION_LABELS = {
-relacion_dependencia: “Relación de dependencia”,
-monotributista: “Monotributista”,
-responsable_inscripto: “Responsable inscripto”,
-informal: “Trabajo informal”,
-desempleado: “Sin ingreso fijo”,
+relacion_dependencia: "Relación de dependencia",
+monotributista: "Monotributista",
+responsable_inscripto: "Responsable inscripto",
+informal: "Trabajo informal",
+desempleado: "Sin ingreso fijo",
 };
 
 const DEBT_TYPES = [
-“Tarjeta de crédito”,“Préstamo personal”,“Cuotas / financiación”,
-“Deuda impositiva (AFIP/ARBA)”,“Deuda de servicios”,“Préstamo informal”,“Otro”,
+"Tarjeta de crédito","Préstamo personal","Cuotas / financiación",
+"Deuda impositiva (AFIP/ARBA)","Deuda de servicios","Préstamo informal","Otro",
 ];
 
 const EXPENSE_CATS = [
-{ key: “alquiler”, label: “Alquiler / Expensas” },
-{ key: “servicios”, label: “Servicios (luz, gas, agua, internet)” },
-{ key: “alimentacion”, label: “Alimentación y supermercado” },
-{ key: “transporte”, label: “Transporte” },
-{ key: “salud”, label: “Salud / Obra social” },
-{ key: “educacion”, label: “Educación” },
-{ key: “otros”, label: “Otros gastos fijos” },
+{ key:"alquiler", label:"Alquiler / Expensas" },
+{ key:"servicios", label:"Servicios (luz, gas, agua, internet)" },
+{ key:"alimentacion", label:"Alimentación y supermercado" },
+{ key:"transporte", label:"Transporte" },
+{ key:"salud", label:"Salud / Obra social" },
+{ key:"educacion", label:"Educación" },
+{ key:"otros", label:"Otros gastos fijos" },
 ];
 
-const MORA_ORDER = { en_mora: 0, atraso_grave: 1, atraso_leve: 2, al_dia: 3 };
-const fmt = (n) => `$${Number(n || 0).toLocaleString("es-AR", { maximumFractionDigits: 0 })}`;
-const fmtPct = (n) => `${Math.round((n || 0) * 100)}%`;
+const MORA_ORDER = { en_mora:0, atraso_grave:1, atraso_leve:2, al_dia:3 };
+const fmt = n => `$${Number(n||0).toLocaleString("es-AR",{maximumFractionDigits:0})}`;
+const fmtPct = n => `${Math.round((n||0)*100)}%`;
 
-// ─── SCORING ENGINE ───────────────────────────────────────────────────────────
+const C = {
+bg:"#0D0F14", card:"#13161D", border:"#181c28",
+accent:"#00E5A0", warn:"#FFB547", danger:"#FF4D6D",
+text:"#E8EAF0", muted:"#6B7280", subtle:"#9CA3AF",
+};
+const nivelColor = { MANEJABLE:C.accent, "EN RIESGO":C.warn, "CRÍTICO":C.danger };
+const estadoColor = { bien:C.accent, regular:C.warn, mal:C.danger };
+const estadoIcon = { bien:"✓", regular:"~", mal:"✕" };
+const tipoMeta = {
+danger:{ border:C.danger, label:"URGENTE" },
+warn: { border:C.warn, label:"IMPORTANTE" },
+accent:{ border:C.accent, label:"ACCIÓN" },
+};
+
+// ── MOTOR SCORING ─────────────────────────────────────────────────────────
 function calcularDiagnostico(ingreso, gastos, deudas) {
-const totalGastos = Object.values(gastos).reduce((s, v) => s + (parseFloat(v) || 0), 0);
-const totalSaldo = deudas.reduce((s, d) => s + (parseFloat(d.balance) || 0), 0);
-const totalMin = deudas.reduce((s, d) => s + (parseFloat(d.minPayment) || 0), 0);
+const totalGastos = Object.values(gastos).reduce((s,v)=>s+(parseFloat(v)||0),0);
+const totalSaldo = deudas.reduce((s,d)=>s+(parseFloat(d.balance)||0),0);
+const totalMin = deudas.reduce((s,d)=>s+(parseFloat(d.minPayment)||0),0);
 const flujoLibre = ingreso - totalGastos - totalMin;
-const ratio = ingreso > 0 ? totalMin / ingreso : 0;
-const mora = deudas.filter(d => d.status === “en_mora” || d.status === “atraso_grave”);
-const alDia = deudas.filter(d => d.status === “al_dia”);
+const ratio = ingreso>0 ? totalMin/ingreso : 0;
+const mora = deudas.filter(d=>d.status==="en_mora"||d.status==="atraso_grave");
+const alDia = deudas.filter(d=>d.status==="al_dia");
 
 let score = 100;
-if (ratio > 0.5) score -= 40;
-else if (ratio > 0.35) score -= 25;
-else if (ratio > 0.2) score -= 10;
-if (flujoLibre < 0) score -= 30;
-else if (flujoLibre < ingreso * 0.1) score -= 15;
-if (mora.length > 0) score -= 20;
-if (deudas.length > 5) score -= 10;
-if (totalGastos > ingreso*0.8) score -= 10;
-score = Math.max(0, Math.min(100, score));
+if (ratio>0.5) score-=40;
+else if (ratio>0.35) score-=25;
+else if (ratio>0.2) score-=10;
+if (flujoLibre<0) score-=30;
+else if (flujoLibre<ingreso*0.1) score-=15;
+if (mora.length>0) score-=20;
+if (deudas.length>5) score-=10;
+if (totalGastos>ingreso*0.8) score-=10;
+score = Math.max(0,Math.min(100,score));
 
-const nivel = score >= 60 ? “MANEJABLE” : score >= 35 ? “EN RIESGO” : “CRÍTICO”;
+const nivel = score>=60?"MANEJABLE":score>=35?"EN RIESGO":"CRÍTICO";
 
-const sorted = […deudas].sort((a,b) => {
-const mo = (MORA_ORDER[a.status]??3) - (MORA_ORDER[b.status]??3);
-return mo !== 0 ? mo : (parseFloat(b.balance)||0) - (parseFloat(a.balance)||0);
+const sorted = [...deudas].sort((a,b)=>{
+const mo=(MORA_ORDER[a.status]??3)-(MORA_ORDER[b.status]??3);
+return mo!==0?mo:(parseFloat(b.balance)||0)-(parseFloat(a.balance)||0);
 });
 const prioritaria = sorted[0];
 
-// Problema principal
-let problema = “”;
-if (flujoLibre < 0) problema = “Tu flujo de caja es negativo: gastás más de lo que ingresa cada mes.”;
-else if (ratio > 0.5) problema = “Más del 50% de tus ingresos se van en pagos de deuda mensual.”;
-else if (mora.length > 0) problema = `Tenés ${mora.length} deuda(s) en mora que deterioran tu perfil crediticio.`;
-else if (ratio > 0.35) problema = “Tu carga de deuda es alta. Sin acción puede volverse crítica.”;
-else problema = “Tu situación es manejable. Con un plan ordenado podés mejorar en menos de 6 meses.”;
+let problema="";
+if (flujoLibre<0) problema="Tu flujo de caja es negativo: gastás más de lo que ingresa cada mes.";
+else if (ratio>0.5) problema="Más del 50% de tus ingresos se van en pagos de deuda mensual.";
+else if (mora.length>0) problema=`Tenés ${mora.length} deuda(s) en mora que deterioran tu perfil crediticio.`;
+else if (ratio>0.35) problema="Tu carga de deuda es alta. Sin acción puede volverse crítica.";
+else problema="Tu situación es manejable. Con un plan ordenado podés mejorar en menos de 6 meses.";
 
-// Plan de acción
-const acciones = [];
-if (flujoLibre < 0) acciones.push({
-titulo: “Reducir gastos de forma urgente”,
-detalle: `Tu flujo libre es ${fmt(flujoLibre)}/mes. Necesitás liberar al menos ${fmt(Math.abs(flujoLibre)+10000)} en gastos para estabilizar la situación.`,
-tipo: “danger”,
+const acciones=[];
+if (flujoLibre<0) acciones.push({
+titulo:"Reducir gastos de forma urgente",
+detalle:`Tu flujo libre es ${fmt(flujoLibre)}/mes. Necesitás liberar al menos ${fmt(Math.abs(flujoLibre)+10000)} en gastos para estabilizar la situación.`,
+tipo:"danger",
 });
 if (prioritaria) acciones.push({
-titulo: “Focalizate en tu deuda más urgente”,
-detalle: `"${prioritaria.type}"${prioritaria.bank?` (${prioritaria.bank})`:""} — saldo ${fmt(prioritaria.balance)}. ${mora.some(d=>d===prioritaria)?"Está en mora: negociá una quita o plan de pagos antes de continuar.":"Canalizá cualquier excedente a cancelarla primero."}`,
-tipo: mora.some(d=>d===prioritaria) ? “danger” : “warn”,
+titulo:"Focalizate en tu deuda más urgente",
+detalle:`"${prioritaria.type}"${prioritaria.bank?` (${prioritaria.bank})`:""} — saldo ${fmt(prioritaria.balance)}. ${mora.some(d=>d===prioritaria)?"Está en mora: negociá una quita o plan de pagos antes de continuar.":"Canalizá cualquier excedente a cancelarla primero."}`,
+tipo:mora.some(d=>d===prioritaria)?"danger":"warn",
 });
-if (ratio > 0.35 && flujoLibre > 0) acciones.push({
-titulo: “Método avalancha para cancelar deudas”,
-detalle: `Con flujo libre de ${fmt(flujoLibre)}/mes, aplicalo a la deuda de mayor costo primero y luego efecto dominó al resto.`,
-tipo: “warn”,
+if (ratio>0.35&&flujoLibre>0) acciones.push({
+titulo:"Método avalancha para cancelar deudas",
+detalle:`Con flujo libre de ${fmt(flujoLibre)}/mes, aplicalo a la deuda de mayor costo primero y luego efecto dominó al resto.`,
+tipo:"warn",
 });
-if (alDia.length >= 2 && flujoLibre > 0) acciones.push({
-titulo: “Evaluar consolidación de deudas”,
-detalle: `Tenés ${alDia.length} deudas al día. Consultá si podés unificarlas en un préstamo único a menor tasa para reducir el pago mínimo total.`,
-tipo: “accent”,
+if (alDia.length>=2&&flujoLibre>0) acciones.push({
+titulo:"Evaluar consolidación de deudas",
+detalle:`Tenés ${alDia.length} deudas al día. Consultá si podés unificarlas en un préstamo único a menor tasa para reducir el pago mínimo total.`,
+tipo:"accent",
 });
 acciones.push({
-titulo: “Construir un colchón de emergencia”,
-detalle: `Una vez estabilizado tu flujo, acumulá ${fmt(ingreso*1.5)} (1.5 meses de ingreso) como reserva para evitar nuevas deudas ante imprevistos.`,
-tipo: “accent”,
+titulo:"Construir un colchón de emergencia",
+detalle:`Una vez estabilizado tu flujo, acumulá ${fmt(ingreso*1.5)} (1.5 meses de ingreso) como reserva para evitar nuevas deudas ante imprevistos.`,
+tipo:"accent",
 });
 
-// Alertas
-const alertas = [];
-if (flujoLibre < 0) alertas.push(“Flujo mensual negativo — emergencia financiera.”);
-if (mora.length > 0) alertas.push(`${mora.length} deuda(s) en mora — riesgo de inhibición de fondos.`);
-if (ratio > 0.5) alertas.push(“Ratio deuda/ingreso crítico — no calificarás para nuevos créditos.”);
-if (totalGastos > ingreso*0.9) alertas.push(“Gastos fijos >90% del ingreso.”);
+const alertas=[];
+if (flujoLibre<0) alertas.push("Flujo mensual negativo — emergencia financiera.");
+if (mora.length>0) alertas.push(`${mora.length} deuda(s) en mora — riesgo de inhibición de fondos.`);
+if (ratio>0.5) alertas.push("Ratio deuda/ingreso crítico — no calificarás para nuevos créditos.");
+if (totalGastos>ingreso*0.9) alertas.push("Gastos fijos >90% del ingreso.");
 
-// Cronograma: avalancha sobre deudas con flujo libre disponible
-const cronograma = generarCronograma(deudas, flujoLibre > 0 ? flujoLibre : 0);
+const cronograma = generarCronograma(deudas, flujoLibre>0?flujoLibre:0);
+const perfilFactores = generarPerfilCrediticio(ratio,mora,score,flujoLibre,ingreso,deudas);
 
-// Perfil crediticio
-const perfilFactores = generarPerfilCrediticio(ratio, mora, score, flujoLibre, ingreso, deudas);
-
-return {
-score, nivel, flujoLibre, totalGastos, totalSaldo, totalMin,
-ratio, problema, prioritaria, acciones, alertas, cronograma, perfilFactores,
-mora, alDia,
-};
+return { score,nivel,flujoLibre,totalGastos,totalSaldo,totalMin,ratio,problema,prioritaria,acciones,alertas,cronograma,perfilFactores,mora,alDia };
 }
 
-// ─── CRONOGRAMA (avalancha) ───────────────────────────────────────────────────
 function generarCronograma(deudas, flujoExtra) {
 if (!deudas.length) return [];
 const pool = deudas
-.filter(d => parseFloat(d.balance) > 0)
-.map((d,i) => ({
-id: i,
-label: d.type + (d.bank ? ` (${d.bank})` : “”),
-saldo: parseFloat(d.balance) || 0,
-minimo: parseFloat(d.minPayment) || 0,
-status: d.status,
-}))
+.filter(d=>parseFloat(d.balance)>0)
+.map((d,i)=>({ id:i, label:d.type+(d.bank?` (${d.bank})`:""), saldo:parseFloat(d.balance)||0, minimo:parseFloat(d.minPayment)||0, status:d.status }))
 .sort((a,b)=>(MORA_ORDER[a.status]??3)-(MORA_ORDER[b.status]??3));
-
-const meses = [];
-let estado = pool.map(d=>({…d}));
-let mes = 0;
-const MAX_MESES = 60;
-
-while (estado.some(d=>d.saldo>0) && mes < MAX_MESES) {
-mes++;
-let extraDisponible = flujoExtra;
-const snap = { mes, deudas: [] };
-
-```
-// Pagos mínimos primero
-estado.forEach(d => { if (d.saldo > 0) d.saldo = Math.max(0, d.saldo - d.minimo); });
-
-// Flujo extra al primero con saldo
-for (let d of estado) {
-if (d.saldo > 0 && extraDisponible > 0) {
-const pago = Math.min(d.saldo, extraDisponible);
-d.saldo -= pago;
-extraDisponible -= pago;
-}
-}
-
-snap.deudas = estado.map(d=>({ id:d.id, label:d.label, saldo:Math.round(d.saldo) }));
-snap.totalSaldo = snap.deudas.reduce((s,d)=>s+d.saldo,0);
+const meses=[]; let estado=pool.map(d=>({...d})); let mes=0;
+while(estado.some(d=>d.saldo>0)&&mes<60){
+mes++; let extra=flujoExtra; const snap={mes,deudas:[]};
+estado.forEach(d=>{ if(d.saldo>0) d.saldo=Math.max(0,d.saldo-d.minimo); });
+for(let d of estado){ if(d.saldo>0&&extra>0){ const p=Math.min(d.saldo,extra); d.saldo-=p; extra-=p; } }
+snap.deudas=estado.map(d=>({id:d.id,label:d.label,saldo:Math.round(d.saldo)}));
+snap.totalSaldo=snap.deudas.reduce((s,d)=>s+d.saldo,0);
 meses.push(snap);
-
-// Si una deuda se cancela, libera su mínimo para el siguiente
-estado.forEach(d => {
-if (d.saldo === 0 && d.minimo > 0) { flujoExtra += d.minimo; d.minimo = 0; }
-});
-```
-
+estado.forEach(d=>{ if(d.saldo===0&&d.minimo>0){ flujoExtra+=d.minimo; d.minimo=0; } });
 }
-
 return meses;
 }
 
-// ─── PERFIL CREDITICIO ────────────────────────────────────────────────────────
-function generarPerfilCrediticio(ratio, mora, score, flujoLibre, ingreso, deudas) {
-const factores = [];
-
-factores.push({
-nombre: “Capacidad de pago”,
-estado: ratio < 0.3 ? “bien” : ratio < 0.5 ? “regular” : “mal”,
-descripcion: ratio < 0.3
-? `Tu ratio deuda/ingreso es ${fmtPct(ratio)}, dentro del rango aceptable para bancos (<30%).`
-: ratio < 0.5
-? `Tu ratio es ${fmtPct(ratio)}. Los bancos prefieren menos del 30%. Necesitás reducirlo antes de solicitar crédito.`
-: `Tu ratio es ${fmtPct(ratio)}, muy por encima del límite. Ningún banco te aprobará hasta bajarlo significativamente.`,
-accion: ratio >= 0.3 ? `Objetivo: llevar el ratio a menos del 30% (${fmt(ingreso*0.3)}/mes en deuda).` : null,
-});
-
-factores.push({
-nombre: “Historial de pagos”,
-estado: mora.length === 0 ? “bien” : mora.length <= 1 ? “regular” : “mal”,
-descripcion: mora.length === 0
-? “No tenés deudas en mora. Este es el factor más valorado por los burós crediticios.”
-: mora.length === 1
-? “Tenés 1 deuda en mora. Regularizarla puede mejorar tu score en 3-6 meses.”
-: `Tenés ${mora.length} deudas en mora. Cada una impacta negativamente en tu historial por hasta 5 años.`,
-accion: mora.length > 0 ? “Regularizá las deudas en mora antes de solicitar cualquier crédito nuevo.” : null,
-});
-
-factores.push({
-nombre: “Flujo disponible”,
-estado: flujoLibre > ingreso*0.15 ? “bien” : flujoLibre > 0 ? “regular” : “mal”,
-descripcion: flujoLibre > ingreso*0.15
-? `Tenés ${fmt(flujoLibre)}/mes de margen libre, lo que demuestra capacidad de afrontar una cuota nueva.`
-: flujoLibre > 0
-? `Tu flujo libre de ${fmt(flujoLibre)}/mes es ajustado. Los bancos exigen al menos el 20-25% de margen sobre el ingreso.`
-: `Tu flujo es negativo (${fmt(flujoLibre)}/mes). No hay margen para ninguna cuota adicional.`,
-accion: flujoLibre <= ingreso*0.15 ? `Necesitás al menos ${fmt(ingreso*0.2)} de flujo libre mensual para calificar.` : null,
-});
-
-factores.push({
-nombre: “Cantidad de deudas”,
-estado: deudas.length <= 2 ? “bien” : deudas.length <= 4 ? “regular” : “mal”,
-descripcion: deudas.length <= 2
-? “Pocas deudas activas. Esto simplifica tu perfil y facilita la aprobación.”
-: deudas.length <= 4
-? `Tenés ${deudas.length} deudas activas. Es manejable pero los bancos lo ven como señal de dependencia del crédito.`
-: `${deudas.length} deudas activas es una señal de alerta para cualquier analista de riesgo.`,
-accion: deudas.length > 2 ? “Cancelá al menos 1-2 deudas antes de solicitar un nuevo crédito.” : null,
-});
-
-const mesesParaCalificar = estimarMesesParaCalificar(ratio, mora, flujoLibre, ingreso, score);
-factores.push({
-nombre: “¿Cuándo podría calificar?”,
-estado: mesesParaCalificar <= 3 ? “bien” : mesesParaCalificar <= 9 ? “regular” : “mal”,
-descripcion: mesesParaCalificar === 0
-? “Con algunas correcciones menores, podrías calificar en menos de 1 mes.”
-: `Siguiendo el plan de acción, estimamos que podrías calificar para un crédito en aproximadamente ${mesesParaCalificar} meses.`,
-accion: `Objetivo: mes ${mesesParaCalificar} — ratio <30%, sin moras, flujo libre >20%.`,
-highlight: true,
-});
-
-return factores;
+function estimarMeses(ratio,mora,flujoLibre,ingreso,score){
+if(score>=70&&mora.length===0&&flujoLibre>ingreso*0.2) return 0;
+let m=0;
+if(mora.length>0) m+=mora.length*3;
+if(ratio>0.5) m+=9; else if(ratio>0.3) m+=4;
+if(flujoLibre<0) m+=6; else if(flujoLibre<ingreso*0.2) m+=2;
+return Math.max(1,m);
 }
 
-function estimarMesesParaCalificar(ratio, mora, flujoLibre, ingreso, score) {
-if (score >= 70 && mora.length === 0 && flujoLibre > ingreso*0.2) return 0;
-let meses = 0;
-if (mora.length > 0) meses += mora.length * 3;
-if (ratio > 0.5) meses += 9;
-else if (ratio > 0.3) meses += 4;
-if (flujoLibre < 0) meses += 6;
-else if (flujoLibre < ingreso*0.2) meses += 2;
-return Math.max(1, meses);
+function generarPerfilCrediticio(ratio,mora,score,flujoLibre,ingreso,deudas){
+const f=[];
+f.push({ nombre:"Capacidad de pago", estado:ratio<0.3?"bien":ratio<0.5?"regular":"mal",
+descripcion:ratio<0.3?`Tu ratio deuda/ingreso es ${fmtPct(ratio)}, dentro del rango aceptable para bancos (<30%).`:ratio<0.5?`Tu ratio es ${fmtPct(ratio)}. Los bancos prefieren menos del 30%. Necesitás reducirlo antes de solicitar crédito.`:`Tu ratio es ${fmtPct(ratio)}, muy por encima del límite. Ningún banco te aprobará hasta bajarlo significativamente.`,
+accion:ratio>=0.3?`Objetivo: llevar el ratio a menos del 30% (${fmt(ingreso*0.3)}/mes en deuda).`:null });
+f.push({ nombre:"Historial de pagos", estado:mora.length===0?"bien":mora.length<=1?"regular":"mal",
+descripcion:mora.length===0?"No tenés deudas en mora. Este es el factor más valorado por los burós crediticios.":mora.length===1?"Tenés 1 deuda en mora. Regularizarla puede mejorar tu score en 3-6 meses.":`Tenés ${mora.length} deudas en mora. Cada una impacta negativamente en tu historial por hasta 5 años.`,
+accion:mora.length>0?"Regularizá las deudas en mora antes de solicitar cualquier crédito nuevo.":null });
+f.push({ nombre:"Flujo disponible", estado:flujoLibre>ingreso*0.15?"bien":flujoLibre>0?"regular":"mal",
+descripcion:flujoLibre>ingreso*0.15?`Tenés ${fmt(flujoLibre)}/mes de margen libre, lo que demuestra capacidad de afrontar una cuota nueva.`:flujoLibre>0?`Tu flujo libre de ${fmt(flujoLibre)}/mes es ajustado. Los bancos exigen al menos el 20-25% de margen sobre el ingreso.`:`Tu flujo es negativo (${fmt(flujoLibre)}/mes). No hay margen para ninguna cuota adicional.`,
+accion:flujoLibre<=ingreso*0.15?`Necesitás al menos ${fmt(ingreso*0.2)} de flujo libre mensual para calificar.`:null });
+f.push({ nombre:"Cantidad de deudas", estado:deudas.length<=2?"bien":deudas.length<=4?"regular":"mal",
+descripcion:deudas.length<=2?"Pocas deudas activas. Esto simplifica tu perfil y facilita la aprobación.":deudas.length<=4?`Tenés ${deudas.length} deudas activas. Es manejable pero los bancos lo ven como señal de dependencia del crédito.`:`${deudas.length} deudas activas es una señal de alerta para cualquier analista de riesgo.`,
+accion:deudas.length>2?"Cancelá al menos 1-2 deudas antes de solicitar un nuevo crédito.":null });
+const meses=estimarMeses(ratio,mora,flujoLibre,ingreso,score);
+f.push({ nombre:"¿Cuándo podría calificar?", estado:meses<=3?"bien":meses<=9?"regular":"mal",
+descripcion:meses===0?"Con algunas correcciones menores, podrías calificar en menos de 1 mes.":`Siguiendo el plan de acción, estimamos que podrías calificar para un crédito en aproximadamente ${meses} meses.`,
+accion:`Objetivo: mes ${meses} — ratio <30%, sin moras, flujo libre >20%.`, highlight:true });
+return f;
 }
 
-// ─── COLORS ───────────────────────────────────────────────────────────────────
-const C = {
-bg: “#0D0F14”, card: “#13161D”, border: “#181c28”,
-accent: “#00E5A0”, warn: “#FFB547”, danger: “#FF4D6D”,
-text: “#E8EAF0”, muted: “#6B7280”, subtle: “#9CA3AF”,
-};
-
-const nivelColor = { MANEJABLE: C.accent, “EN RIESGO”: C.warn, CRÍTICO: C.danger };
-const estadoColor = { bien: C.accent, regular: C.warn, mal: C.danger };
-const estadoIcon = { bien: “✓”, regular: “~”, mal: “✕” };
-
-const tipoMeta = {
-danger: { border: C.danger, label: “URGENTE” },
-warn: { border: C.warn, label: “IMPORTANTE” },
-accent: { border: C.accent, label: “ACCIÓN” },
-};
-
-// ─── SHARED UI ────────────────────────────────────────────────────────────────
-function ReadOnly({ label, value }) {
-return (
-<div style={{ marginBottom: 14 }}>
-<div style={{ fontSize: 10, color: C.muted, letterSpacing: “0.06em”, textTransform: “uppercase”, fontFamily: “‘Syne’,sans-serif”, marginBottom: 4 }}>{label}</div>
-<div style={{ background: “#090b0f”, border: `1.5px solid ${C.border}`, borderRadius: 9, padding: “10px 13px”, color: C.subtle, fontSize: 14, fontFamily: “‘DM Sans’,sans-serif” }}>{value}</div>
-</div>
-);
+// ── UI COMPONENTS ─────────────────────────────────────────────────────────
+function ReadOnly({label,value}){
+return <div style={{marginBottom:14}}>
+<div style={{fontSize:10,color:C.muted,letterSpacing:"0.06em",textTransform:"uppercase",fontFamily:"'Syne',sans-serif",marginBottom:4}}>{label}</div>
+<div style={{background:"#090b0f",border:`1.5px solid ${C.border}`,borderRadius:9,padding:"10px 13px",color:C.subtle,fontSize:14,fontFamily:"'DM Sans',sans-serif"}}>{value}</div>
+</div>;
 }
 
-function Field({ label, value, onChange, type=“text”, prefix, placeholder }) {
-const [f, setF] = useState(false);
-return (
-<div style={{ marginBottom: 16 }}>
-<div style={{ fontSize: 10, color: C.subtle, letterSpacing: “0.06em”, textTransform: “uppercase”, fontFamily: “‘Syne’,sans-serif”, marginBottom: 5 }}>{label}</div>
-<div style={{ position: “relative” }}>
-{prefix && <span style={{ position: “absolute”, left: 13, top: “50%”, transform: “translateY(-50%)”, color: C.accent, fontSize: 13, fontWeight: 700, fontFamily: “‘Syne’,sans-serif” }}>{prefix}</span>}
+function Field({label,value,onChange,type="text",prefix,placeholder}){
+const [f,setF]=useState(false);
+return <div style={{marginBottom:16}}>
+<div style={{fontSize:10,color:C.subtle,letterSpacing:"0.06em",textTransform:"uppercase",fontFamily:"'Syne',sans-serif",marginBottom:5}}>{label}</div>
+<div style={{position:"relative"}}>
+{prefix&&<span style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",color:C.accent,fontSize:13,fontWeight:700,fontFamily:"'Syne',sans-serif"}}>{prefix}</span>}
 <input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
 onFocus={()=>setF(true)} onBlur={()=>setF(false)}
-style={{
-width: “100%”, boxSizing: “border-box”, background: “#090b0f”,
-border: `1.5px solid ${f ? C.accent : C.border}`,
-borderRadius: 9, padding: prefix ? “11px 13px 11px 28px” : “11px 13px”,
-color: C.text, fontSize: 14, outline: “none”,
-fontFamily: “‘DM Sans’,sans-serif”, transition: “border 0.2s”,
-}} />
+style={{width:"100%",boxSizing:"border-box",background:"#090b0f",border:`1.5px solid ${f?C.accent:C.border}`,borderRadius:9,padding:prefix?"11px 13px 11px 28px":"11px 13px",color:C.text,fontSize:14,outline:"none",fontFamily:"'DM Sans',sans-serif",transition:"border 0.2s"}}/>
 </div>
-</div>
-);
+</div>;
 }
 
-function Sel({ label, value, onChange, options }) {
-const [f, setF] = useState(false);
-return (
-<div style={{ marginBottom: 16 }}>
-<div style={{ fontSize: 10, color: C.subtle, letterSpacing: “0.06em”, textTransform: “uppercase”, fontFamily: “‘Syne’,sans-serif”, marginBottom: 5 }}>{label}</div>
+function Sel({label,value,onChange,options}){
+const [f,setF]=useState(false);
+return <div style={{marginBottom:16}}>
+<div style={{fontSize:10,color:C.subtle,letterSpacing:"0.06em",textTransform:"uppercase",fontFamily:"'Syne',sans-serif",marginBottom:5}}>{label}</div>
 <select value={value} onChange={e=>onChange(e.target.value)} onFocus={()=>setF(true)} onBlur={()=>setF(false)}
-style={{
-width: “100%”, background: “#090b0f”, border: `1.5px solid ${f?C.accent:C.border}`,
-borderRadius: 9, padding: “11px 13px”, color: value?C.text:C.muted,
-fontSize: 14, outline: “none”, fontFamily: “‘DM Sans’,sans-serif”,
-appearance: “none”, cursor: “pointer”, transition: “border 0.2s”,
-}}>
-{options.map(o=><option key={o.v} value={o.v} style={{background:”#13161D”}}>{o.l}</option>)}
+style={{width:"100%",background:"#090b0f",border:`1.5px solid ${f?C.accent:C.border}`,borderRadius:9,padding:"11px 13px",color:value?C.text:C.muted,fontSize:14,outline:"none",fontFamily:"'DM Sans',sans-serif",appearance:"none",cursor:"pointer",transition:"border 0.2s"}}>
+{options.map(o=><option key={o.v} value={o.v} style={{background:"#13161D"}}>{o.l}</option>)}
 </select>
-</div>
-);
+</div>;
 }
 
-function DebtCard({ debt, index, onChange, onRemove }) {
-return (
-<div style={{ background:”#090b0f”, border:`1.5px solid ${C.border}`, borderLeft:`3px solid #00E5A030`, borderRadius:12, padding:“16px 16px 2px”, marginBottom:12 }}>
-<div style={{ display:“flex”, justifyContent:“space-between”, alignItems:“center”, marginBottom:12 }}>
-<span style={{ fontSize:10, color:C.accent, fontWeight:700, letterSpacing:“0.08em”, fontFamily:”‘Syne’,sans-serif” }}>DEUDA #{index+1}</span>
-<button onClick={onRemove} style={{ background:“none”, border:“none”, color:”#FF4D6D70”, cursor:“pointer”, fontSize:20, lineHeight:1, transition:“color 0.2s” }}
-onMouseEnter={e=>e.target.style.color=C.danger} onMouseLeave={e=>e.target.style.color=”#FF4D6D70”}>×</button>
+function DebtCard({debt,index,onChange,onRemove}){
+return <div style={{background:"#090b0f",border:`1.5px solid ${C.border}`,borderLeft:`3px solid #00E5A030`,borderRadius:12,padding:"16px 16px 2px",marginBottom:12}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+<span style={{fontSize:10,color:C.accent,fontWeight:700,letterSpacing:"0.08em",fontFamily:"'Syne',sans-serif"}}>DEUDA #{index+1}</span>
+<button onClick={onRemove} style={{background:"none",border:"none",color:"#FF4D6D70",cursor:"pointer",fontSize:20,lineHeight:1}}
+onMouseEnter={e=>e.target.style.color=C.danger} onMouseLeave={e=>e.target.style.color="#FF4D6D70"}>×</button>
 </div>
-<Sel label=“Tipo de deuda” value={debt.type} onChange={v=>onChange({…debt,type:v})}
-options={[{v:””,l:“Seleccioná…”}, …DEBT_TYPES.map(t=>({v:t,l:t}))]} />
-{debt.type===“Tarjeta de crédito” && (
-<Field label=“Banco / Entidad” value={debt.bank||””} onChange={v=>onChange({…debt,bank:v})} placeholder=“Ej: Santander, Galicia…” />
-)}
-<div style={{ display:“grid”, gridTemplateColumns:“1fr 1fr”, gap:10 }}>
-<Field label=“Saldo total” value={debt.balance} onChange={v=>onChange({…debt,balance:v})} type=“number” prefix=”$” placeholder=“0” />
-<Field label=“Pago mínimo/mes” value={debt.minPayment} onChange={v=>onChange({…debt,minPayment:v})} type=“number” prefix=”$” placeholder=“0” />
+<Sel label="Tipo de deuda" value={debt.type} onChange={v=>onChange({...debt,type:v})}
+options={[{v:"",l:"Seleccioná..."}, ...DEBT_TYPES.map(t=>({v:t,l:t}))]}/>
+{debt.type==="Tarjeta de crédito"&&<Field label="Banco / Entidad" value={debt.bank||""} onChange={v=>onChange({...debt,bank:v})} placeholder="Ej: Santander, Galicia..."/>}
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+<Field label="Saldo total" value={debt.balance} onChange={v=>onChange({...debt,balance:v})} type="number" prefix="$" placeholder="0"/>
+<Field label="Pago mínimo/mes" value={debt.minPayment} onChange={v=>onChange({...debt,minPayment:v})} type="number" prefix="$" placeholder="0"/>
 </div>
-<Sel label=“Estado actual” value={debt.status} onChange={v=>onChange({…debt,status:v})}
-options={[{v:””,l:“Seleccioná…”},{v:“al_dia”,l:“✅ Al día”},{v:“atraso_leve”,l:“🟡 Atraso leve (1-60 días)”},{v:“atraso_grave”,l:“🔴 Atraso grave (+60 días)”},{v:“en_mora”,l:“🚨 En mora / en juicio”}]} />
-</div>
-);
+<Sel label="Estado actual" value={debt.status} onChange={v=>onChange({...debt,status:v})}
+options={[{v:"",l:"Seleccioná..."},{v:"al_dia",l:"✅ Al día"},{v:"atraso_leve",l:"🟡 Atraso leve (1-60 días)"},{v:"atraso_grave",l:"🔴 Atraso grave (+60 días)"},{v:"en_mora",l:"🚨 En mora / en juicio"}]}/>
+</div>;
 }
 
-// ─── SCORE METER ──────────────────────────────────────────────────────────────
-function ScoreMeter({ score }) {
-const [val, setVal] = useState(0);
-useEffect(() => {
-let v = 0; const step = score/50;
-const t = setInterval(()=>{ v+=step; if(v>=score){setVal(score);clearInterval(t);}else setVal(Math.round(v)); },16);
-return ()=>clearInterval(t);
-}, [score]);
-const color = val<35?C.danger:val<60?C.warn:C.accent;
-const r=52, circ=2*Math.PI*r, dash=(Math.min(val,100)/100)*circ;
-return (
-<div style={{display:“flex”,flexDirection:“column”,alignItems:“center”}}>
+function ScoreMeter({score}){
+const [val,setVal]=useState(0);
+useEffect(()=>{
+let v=0; const step=score/50;
+const t=setInterval(()=>{ v+=step; if(v>=score){setVal(score);clearInterval(t);}else setVal(Math.round(v)); },16);
+return()=>clearInterval(t);
+},[score]);
+const color=val<35?C.danger:val<60?C.warn:C.accent;
+const r=52,circ=2*Math.PI*r,dash=(Math.min(val,100)/100)*circ;
+return <div style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
 <svg width="140" height="140" viewBox="0 0 140 140">
 <circle cx="70" cy="70" r={r} fill="none" stroke="#181c28" strokeWidth="14"/>
-<circle cx=“70” cy=“70” r={r} fill=“none” stroke={color} strokeWidth=“14”
-strokeDasharray={`${dash} ${circ}`} strokeLinecap=“round”
-transform=“rotate(-90 70 70)” style={{transition:“stroke-dasharray 0.04s linear,stroke 0.4s”}}/>
+<circle cx="70" cy="70" r={r} fill="none" stroke={color} strokeWidth="14"
+strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
+transform="rotate(-90 70 70)" style={{transition:"stroke-dasharray 0.04s linear,stroke 0.4s"}}/>
 <text x="70" y="64" textAnchor="middle" fill={color} fontSize="32" fontWeight="900" fontFamily="'DM Serif Display',serif">{val}</text>
 <text x="70" y="82" textAnchor="middle" fill="#4B5563" fontSize="12" fontFamily="'Syne',sans-serif">/100</text>
 </svg>
-</div>
-);
+</div>;
 }
 
-// ─── TAB COMPONENT ────────────────────────────────────────────────────────────
-function Tabs({ tabs, active, onChange }) {
-return (
-<div style={{ display:“flex”, gap:4, marginBottom:24, overflowX:“auto”, paddingBottom:4 }}>
+function Tabs({tabs,active,onChange}){
+return <div style={{display:"flex",gap:4,marginBottom:24,overflowX:"auto",paddingBottom:4}}>
 {tabs.map(t=>(
-<button key={t.id} onClick={()=>onChange(t.id)} style={{
-padding:“8px 14px”, borderRadius:8, fontSize:12, fontWeight:600,
-fontFamily:”‘Syne’,sans-serif”, cursor:“pointer”, whiteSpace:“nowrap”,
-border:`1.5px solid ${active===t.id?C.accent:C.border}`,
-background: active===t.id?”#00E5A015”:“transparent”,
-color: active===t.id?C.accent:C.muted,
-transition:“all 0.2s”,
-}}>
+<button key={t.id} onClick={()=>onChange(t.id)} style={{padding:"8px 14px",borderRadius:8,fontSize:12,fontWeight:600,fontFamily:"'Syne',sans-serif",cursor:"pointer",whiteSpace:"nowrap",border:`1.5px solid ${active===t.id?C.accent:C.border}`,background:active===t.id?"#00E5A015":"transparent",color:active===t.id?C.accent:C.muted,transition:"all 0.2s"}}>
 {t.icon} {t.label}
 </button>
 ))}
-</div>
-);
+</div>;
 }
 
-// ─── TAB: RESUMEN ─────────────────────────────────────────────────────────────
-function TabResumen({ d }) {
-const nc = nivelColor[d.nivel] || C.accent;
-return (
-<div>
-{/* Score hero */}
-<div style={{ background:C.card, border:`1px solid ${nc}25`, borderRadius:16, padding:“28px 22px 22px”, textAlign:“center”, marginBottom:18 }}>
+function TabResumen({d}){
+const nc=nivelColor[d.nivel]||C.accent;
+return <div>
+<div style={{background:C.card,border:`1px solid ${nc}25`,borderRadius:16,padding:"28px 22px 22px",textAlign:"center",marginBottom:18}}>
 <ScoreMeter score={d.score}/>
-<div style={{ display:“inline-block”, marginTop:8, background:`${nc}18`, border:`1.5px solid ${nc}50`, borderRadius:8, padding:“5px 18px”, fontSize:12, fontWeight:800, color:nc, fontFamily:”‘Syne’,sans-serif”, letterSpacing:“0.1em” }}>{d.nivel}</div>
-<p style={{ fontSize:14, color:C.subtle, marginTop:12, lineHeight:1.7, maxWidth:380, margin:“12px auto 0”, fontFamily:”‘DM Sans’,sans-serif” }}>{d.problema}</p>
+<div style={{display:"inline-block",marginTop:8,background:`${nc}18`,border:`1.5px solid ${nc}50`,borderRadius:8,padding:"5px 18px",fontSize:12,fontWeight:800,color:nc,fontFamily:"'Syne',sans-serif",letterSpacing:"0.1em"}}>{d.nivel}</div>
+<p style={{fontSize:14,color:C.subtle,marginTop:12,lineHeight:1.7,maxWidth:380,margin:"12px auto 0",fontFamily:"'DM Sans',sans-serif"}}>{d.problema}</p>
 </div>
-
-```
-{/* Métricas */}
-<div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:18 }}>
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:18}}>
 {[
-{ label:"Flujo libre/mes", value:fmt(d.flujoLibre), color:d.flujoLibre<0?C.danger:C.accent, sub:d.flujoLibre<0?"déficit":"disponible" },
-{ label:"Deuda total", value:fmt(d.totalSaldo), color:C.warn, sub:`${d.alDia.length+d.mora.length} deudas` },
-{ label:"% ingreso en deuda", value:fmtPct(d.ratio), color:d.ratio>0.5?C.danger:d.ratio>0.35?C.warn:C.accent, sub:"ratio mensual" },
+{label:"Flujo libre/mes",value:fmt(d.flujoLibre),color:d.flujoLibre<0?C.danger:C.accent,sub:d.flujoLibre<0?"déficit":"disponible"},
+{label:"Deuda total",value:fmt(d.totalSaldo),color:C.warn,sub:`${d.alDia.length+d.mora.length} deudas`},
+{label:"% ingreso en deuda",value:fmtPct(d.ratio),color:d.ratio>0.5?C.danger:d.ratio>0.35?C.warn:C.accent,sub:"ratio mensual"},
 ].map(m=>(
-<div key={m.label} style={{ background:"#090b0f", border:`1px solid ${C.border}`, borderRadius:12, padding:"14px 10px", textAlign:"center" }}>
-<div style={{ fontSize:10, color:C.muted, fontFamily:"'Syne',sans-serif", marginBottom:6 }}>{m.label}</div>
-<div style={{ fontSize:16, fontWeight:700, color:m.color, fontFamily:"'DM Serif Display',serif" }}>{m.value}</div>
-<div style={{ fontSize:10, color:"#4B5563", marginTop:3, fontFamily:"'Syne',sans-serif" }}>{m.sub}</div>
+<div key={m.label} style={{background:"#090b0f",border:`1px solid ${C.border}`,borderRadius:12,padding:"14px 10px",textAlign:"center"}}>
+<div style={{fontSize:10,color:C.muted,fontFamily:"'Syne',sans-serif",marginBottom:6}}>{m.label}</div>
+<div style={{fontSize:16,fontWeight:700,color:m.color,fontFamily:"'DM Serif Display',serif"}}>{m.value}</div>
+<div style={{fontSize:10,color:"#4B5563",marginTop:3,fontFamily:"'Syne',sans-serif"}}>{m.sub}</div>
 </div>
 ))}
 </div>
-
-{/* Alertas */}
-{d.alertas.length>0 && (
-<div style={{ background:"#FF4D6D08", border:`1px solid #FF4D6D25`, borderRadius:12, padding:"14px 16px" }}>
-<div style={{ fontSize:10, color:C.danger, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Syne',sans-serif", marginBottom:10 }}>⚠️ Alertas detectadas</div>
-{d.alertas.map((a,i)=>(
-<p key={i} style={{ fontSize:12, color:C.subtle, marginBottom:i<d.alertas.length-1?6:0, lineHeight:1.55, fontFamily:"'DM Sans',sans-serif" }}>· {a}</p>
-))}
-</div>
-)}
-</div>
-```
-
-);
+{d.alertas.length>0&&<div style={{background:"#FF4D6D08",border:`1px solid #FF4D6D25`,borderRadius:12,padding:"14px 16px"}}>
+<div style={{fontSize:10,color:C.danger,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:"'Syne',sans-serif",marginBottom:10}}>⚠️ Alertas detectadas</div>
+{d.alertas.map((a,i)=><p key={i} style={{fontSize:12,color:C.subtle,marginBottom:i<d.alertas.length-1?6:0,lineHeight:1.55,fontFamily:"'DM Sans',sans-serif"}}>· {a}</p>)}
+</div>}
+</div>;
 }
 
-// ─── TAB: PLAN DE ACCIÓN ──────────────────────────────────────────────────────
-function TabPlan({ acciones }) {
-return (
-<div>
-<p style={{ fontSize:13, color:C.muted, marginBottom:20, lineHeight:1.65, fontFamily:”‘DM Sans’,sans-serif” }}>
-Pasos ordenados por prioridad. Empezá desde arriba y avanzá en secuencia.
-</p>
+function TabPlan({acciones}){
+return <div>
+<p style={{fontSize:13,color:C.muted,marginBottom:20,lineHeight:1.65,fontFamily:"'DM Sans',sans-serif"}}>Pasos ordenados por prioridad. Empezá desde arriba y avanzá en secuencia.</p>
 {acciones.map((a,i)=>{
-const m = tipoMeta[a.tipo]||tipoMeta.accent;
-return (
-<div key={i} style={{ border:`1.5px solid ${m.border}25`, borderLeft:`3px solid ${m.border}`, background:`${m.border}06`, borderRadius:10, padding:“15px 16px”, marginBottom:10, display:“flex”, gap:12 }}>
-<div style={{ width:26, height:26, borderRadius:“50%”, background:`${m.border}20`, border:`1.5px solid ${m.border}60`, display:“flex”, alignItems:“center”, justifyContent:“center”, fontSize:11, fontWeight:900, color:m.border, flexShrink:0, fontFamily:”‘Syne’,sans-serif” }}>{i+1}</div>
+const m=tipoMeta[a.tipo]||tipoMeta.accent;
+return <div key={i} style={{border:`1.5px solid ${m.border}25`,borderLeft:`3px solid ${m.border}`,background:`${m.border}06`,borderRadius:10,padding:"15px 16px",marginBottom:10,display:"flex",gap:12}}>
+<div style={{width:26,height:26,borderRadius:"50%",background:`${m.border}20`,border:`1.5px solid ${m.border}60`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:900,color:m.border,flexShrink:0,fontFamily:"'Syne',sans-serif"}}>{i+1}</div>
 <div>
-<div style={{ display:“flex”, alignItems:“center”, gap:8, marginBottom:5, flexWrap:“wrap” }}>
-<span style={{ fontSize:14, fontWeight:700, color:C.text, fontFamily:”‘DM Serif Display’,serif” }}>{a.titulo}</span>
-<span style={{ background:`${m.border}20`, border:`1px solid ${m.border}50`, color:m.border, borderRadius:5, padding:“2px 8px”, fontSize:9, fontWeight:800, letterSpacing:“0.08em”, fontFamily:”‘Syne’,sans-serif” }}>{m.label}</span>
+<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5,flexWrap:"wrap"}}>
+<span style={{fontSize:14,fontWeight:700,color:C.text,fontFamily:"'DM Serif Display',serif"}}>{a.titulo}</span>
+<span style={{background:`${m.border}20`,border:`1px solid ${m.border}50`,color:m.border,borderRadius:5,padding:"2px 8px",fontSize:9,fontWeight:800,letterSpacing:"0.08em",fontFamily:"'Syne',sans-serif"}}>{m.label}</span>
 </div>
-<p style={{ fontSize:13, color:C.subtle, margin:0, lineHeight:1.65, fontFamily:”‘DM Sans’,sans-serif” }}>{a.detalle}</p>
+<p style={{fontSize:13,color:C.subtle,margin:0,lineHeight:1.65,fontFamily:"'DM Sans',sans-serif"}}>{a.detalle}</p>
 </div>
-</div>
-);
+</div>;
 })}
-</div>
-);
+</div>;
 }
 
-// ─── TAB: CRONOGRAMA ─────────────────────────────────────────────────────────
-function TabCronograma({ cronograma, deudas, flujoLibre }) {
-const [extra, setExtra] = useState(0);
-const [crono, setCrono] = useState(cronograma);
-
-useEffect(()=>{
-const nuevo = generarCronograma(deudas, Math.max(0, flujoLibre) + (parseFloat(extra)||0));
-setCrono(nuevo);
-}, [extra]);
-
-if (!crono.length) return (
-<p style={{ color:C.muted, fontSize:14, fontFamily:”‘DM Sans’,sans-serif” }}>
-Con flujo libre negativo no es posible calcular un cronograma. Primero reducí tus gastos.
-</p>
-);
-
-const totalInicial = deudas.reduce((s,d)=>s+(parseFloat(d.balance)||0),0);
-const mesesTotal = crono.length;
-const mesesLabel = mesesTotal>=60 ? “+60 meses” : `${mesesTotal} meses`;
-
-// Puntos de cancelación por deuda
-const labels = […new Set(deudas.filter(d=>parseFloat(d.balance)>0).map((d,i)=>d.type+(d.bank?` (${d.bank})`:””)+”#”+i))];
-
-return (
-<div>
-<p style={{ fontSize:13, color:C.muted, marginBottom:16, lineHeight:1.65, fontFamily:”‘DM Sans’,sans-serif” }}>
-Proyección mes a mes usando el método avalancha. Cada deuda cancelada libera su cuota para atacar la siguiente.
-</p>
-
-```
-{/* Extra input */}
-<div style={{ background:"#090b0f", border:`1px solid ${C.border}`, borderRadius:10, padding:"14px 16px", marginBottom:20, display:"flex", alignItems:"center", gap:14, flexWrap:"wrap" }}>
-<span style={{ fontSize:12, color:C.muted, fontFamily:"'Syne',sans-serif", flexShrink:0 }}>¿Podés sumar un extra mensual?</span>
-<div style={{ display:"flex", alignItems:"center", gap:6 }}>
-<span style={{ color:C.accent, fontWeight:700, fontSize:13 }}>$</span>
+function TabCronograma({cronograma,deudas,flujoLibre}){
+const [extra,setExtra]=useState(0);
+const [crono,setCrono]=useState(cronograma);
+useEffect(()=>{ setCrono(generarCronograma(deudas,Math.max(0,flujoLibre)+(parseFloat(extra)||0))); },[extra]);
+if(!crono.length) return <p style={{color:C.muted,fontSize:14,fontFamily:"'DM Sans',sans-serif"}}>Con flujo libre negativo no es posible calcular un cronograma. Primero reducí tus gastos.</p>;
+const totalInicial=deudas.reduce((s,d)=>s+(parseFloat(d.balance)||0),0);
+const mesesLabel=crono.length>=60?"+60 meses":`${crono.length} meses`;
+return <div>
+<p style={{fontSize:13,color:C.muted,marginBottom:16,lineHeight:1.65,fontFamily:"'DM Sans',sans-serif"}}>Proyección mes a mes usando el método avalancha. Cada deuda cancelada libera su cuota para atacar la siguiente.</p>
+<div style={{background:"#090b0f",border:`1px solid ${C.border}`,borderRadius:10,padding:"14px 16px",marginBottom:20,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+<span style={{fontSize:12,color:C.muted,fontFamily:"'Syne',sans-serif",flexShrink:0}}>¿Podés sumar un extra mensual?</span>
+<div style={{display:"flex",alignItems:"center",gap:6}}>
+<span style={{color:C.accent,fontWeight:700,fontSize:13}}>$</span>
 <input type="number" value={extra} onChange={e=>setExtra(e.target.value)} placeholder="0"
-style={{ width:120, background:"#13161D", border:`1.5px solid ${C.border}`, borderRadius:8, padding:"8px 10px", color:C.text, fontSize:14, outline:"none", fontFamily:"'DM Sans',sans-serif" }}/>
+style={{width:120,background:"#13161D",border:`1.5px solid ${C.border}`,borderRadius:8,padding:"8px 10px",color:C.text,fontSize:14,outline:"none",fontFamily:"'DM Sans',sans-serif"}}/>
 </div>
-<span style={{ fontSize:12, color:C.accent, fontFamily:"'Syne',sans-serif", fontWeight:600 }}>→ {mesesLabel} para cancelar todo</span>
+<span style={{fontSize:12,color:C.accent,fontFamily:"'Syne',sans-serif",fontWeight:600}}>→ {mesesLabel} para cancelar todo</span>
 </div>
-
-{/* Gráfico de barras simplificado */}
-<div style={{ marginBottom:20 }}>
-<div style={{ fontSize:10, color:C.muted, fontFamily:"'Syne',sans-serif", letterSpacing:"0.06em", textTransform:"uppercase", marginBottom:10 }}>Evolución de deuda total</div>
-<div style={{ display:"flex", alignItems:"flex-end", gap:3, height:80 }}>
-{crono.filter((_,i)=>i%Math.max(1,Math.floor(crono.length/20))===0 || i===crono.length-1).map((m,i,arr)=>{
-const pct = totalInicial>0 ? m.totalSaldo/totalInicial : 0;
-const color = pct>0.6?C.danger:pct>0.3?C.warn:C.accent;
-return (
-<div key={m.mes} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:3 }}>
-<div style={{ width:"100%", height:Math.max(2,pct*72), background:color, borderRadius:"2px 2px 0 0", opacity:0.8, transition:"height 0.3s" }}/>
-{(i===0||i===Math.floor(arr.length/2)||i===arr.length-1) && (
-<span style={{ fontSize:8, color:C.muted, fontFamily:"'Syne',sans-serif" }}>M{m.mes}</span>
-)}
-</div>
-);
+<div style={{marginBottom:20}}>
+<div style={{fontSize:10,color:C.muted,fontFamily:"'Syne',sans-serif",letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:10}}>Evolución de deuda total</div>
+<div style={{display:"flex",alignItems:"flex-end",gap:3,height:80}}>
+{crono.filter((_,i)=>i%Math.max(1,Math.floor(crono.length/20))===0||i===crono.length-1).map((m,i,arr)=>{
+const pct=totalInicial>0?m.totalSaldo/totalInicial:0;
+const color=pct>0.6?C.danger:pct>0.3?C.warn:C.accent;
+return <div key={m.mes} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+<div style={{width:"100%",height:Math.max(2,pct*72),background:color,borderRadius:"2px 2px 0 0",opacity:0.8}}/>
+{(i===0||i===Math.floor(arr.length/2)||i===arr.length-1)&&<span style={{fontSize:8,color:C.muted,fontFamily:"'Syne',sans-serif"}}>M{m.mes}</span>}
+</div>;
 })}
 </div>
-<div style={{ display:"flex", justifyContent:"space-between", marginTop:6 }}>
-<span style={{ fontSize:11, color:C.muted, fontFamily:"'Syne',sans-serif" }}>{fmt(totalInicial)}</span>
-<span style={{ fontSize:11, color:C.accent, fontFamily:"'Syne',sans-serif" }}>$0</span>
+<div style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
+<span style={{fontSize:11,color:C.muted,fontFamily:"'Syne',sans-serif"}}>{fmt(totalInicial)}</span>
+<span style={{fontSize:11,color:C.accent,fontFamily:"'Syne',sans-serif"}}>$0</span>
 </div>
 </div>
-
-{/* Tabla hitos */}
-<div style={{ fontSize:10, color:C.muted, fontFamily:"'Syne',sans-serif", letterSpacing:"0.06em", textTransform:"uppercase", marginBottom:10 }}>Hitos del cronograma</div>
+<div style={{fontSize:10,color:C.muted,fontFamily:"'Syne',sans-serif",letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:10}}>Hitos del cronograma</div>
 {[1,3,6,12,24,36,48,60].filter(m=>m<=crono.length).map(mesN=>{
-const snap = crono[mesN-1];
-if(!snap) return null;
-const pct = totalInicial>0?((totalInicial-snap.totalSaldo)/totalInicial*100):100;
-return (
-<div key={mesN} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:"#090b0f", border:`1px solid ${C.border}`, borderRadius:8, marginBottom:8 }}>
-<div style={{ width:40, textAlign:"center" }}>
-<span style={{ fontSize:11, color:C.accent, fontWeight:700, fontFamily:"'Syne',sans-serif" }}>Mes {mesN}</span>
+const snap=crono[mesN-1]; if(!snap) return null;
+const pct=totalInicial>0?((totalInicial-snap.totalSaldo)/totalInicial*100):100;
+return <div key={mesN} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",background:"#090b0f",border:`1px solid ${C.border}`,borderRadius:8,marginBottom:8}}>
+<span style={{fontSize:11,color:C.accent,fontWeight:700,fontFamily:"'Syne',sans-serif",width:50}}>Mes {mesN}</span>
+<div style={{flex:1,height:4,background:"#1a1e2a",borderRadius:2,overflow:"hidden"}}>
+<div style={{height:"100%",width:`${pct}%`,background:pct>70?C.accent:pct>40?C.warn:C.danger,borderRadius:2,transition:"width 0.5s"}}/>
 </div>
-<div style={{ flex:1 }}>
-<div style={{ height:4, background:"#1a1e2a", borderRadius:2, overflow:"hidden" }}>
-<div style={{ height:"100%", width:`${pct}%`, background:pct>70?C.accent:pct>40?C.warn:C.danger, borderRadius:2, transition:"width 0.5s" }}/>
-</div>
-</div>
-<div style={{ textAlign:"right", minWidth:100 }}>
-<span style={{ fontSize:13, color:snap.totalSaldo===0?C.accent:C.text, fontWeight:snap.totalSaldo===0?700:400, fontFamily:"'DM Serif Display',serif" }}>
-{snap.totalSaldo===0?"✓ Cancelado":fmt(snap.totalSaldo)}
-</span>
-</div>
-<div style={{ width:32, textAlign:"right" }}>
-<span style={{ fontSize:10, color:C.muted, fontFamily:"'Syne',sans-serif" }}>{Math.round(pct)}%</span>
-</div>
-</div>
-);
+<span style={{fontSize:13,color:snap.totalSaldo===0?C.accent:C.text,fontWeight:snap.totalSaldo===0?700:400,fontFamily:"'DM Serif Display',serif",minWidth:100,textAlign:"right"}}>{snap.totalSaldo===0?"✓ Cancelado":fmt(snap.totalSaldo)}</span>
+<span style={{fontSize:10,color:C.muted,fontFamily:"'Syne',sans-serif",width:32,textAlign:"right"}}>{Math.round(pct)}%</span>
+</div>;
 })}
-</div>
-```
-
-);
+</div>;
 }
 
-// ─── TAB: SIMULADOR ───────────────────────────────────────────────────────────
-function TabSimulador({ d, ingreso }) {
-const [gastoExtra, setGastoExtra] = useState(0);
-const [pagoExtra, setPagoExtra] = useState(0);
-const [ingresoExtra, setIngresoExtra] = useState(0);
-
-const nuevoFlujo = d.flujoLibre - (parseFloat(gastoExtra)||0) + (parseFloat(ingresoExtra)||0);
-const nuevoPago = d.totalMin + (parseFloat(pagoExtra)||0);
-const nuevoRatio = ingreso>0 ? nuevoPago/ingreso : 0;
-const nuevoFlujoFinal = nuevoFlujo - (parseFloat(pagoExtra)||0);
-const mejora = nuevoFlujoFinal - d.flujoLibre;
-
-const nuevoScore = (() => {
-let s = 100;
-if (nuevoRatio>0.5) s-=40;
-else if (nuevoRatio>0.35) s-=25;
-else if (nuevoRatio>0.2) s-=10;
-if (nuevoFlujoFinal<0) s-=30;
-else if (nuevoFlujoFinal<ingreso*0.1) s-=15;
-if (d.mora.length>0) s-=20;
-return Math.max(0,Math.min(100,s));
-})();
-
-const deltaScore = nuevoScore - d.score;
-
-const scenarios = [
-{ label:“Libero $20.000 en gastos”, gasto:20000, pago:0, ing:0 },
-{ label:“Sumo $50.000 extra al pago”,gasto:0, pago:50000, ing:0 },
-{ label:“Aumento de ingreso 15%”, gasto:0, pago:0, ing:Math.round(ingreso*0.15) },
-{ label:“Todo junto”, gasto:20000, pago:50000, ing:Math.round(ingreso*0.1) },
+function TabSimulador({d,ingreso}){
+const [gastoExtra,setGastoExtra]=useState(0);
+const [pagoExtra,setPagoExtra]=useState(0);
+const [ingresoExtra,setIngresoExtra]=useState(0);
+const nuevoFlujo=d.flujoLibre-(parseFloat(gastoExtra)||0)+(parseFloat(ingresoExtra)||0);
+const nuevoPago=d.totalMin+(parseFloat(pagoExtra)||0);
+const nuevoRatio=ingreso>0?nuevoPago/ingreso:0;
+const nuevoFlujoFinal=nuevoFlujo-(parseFloat(pagoExtra)||0);
+const mejora=nuevoFlujoFinal-d.flujoLibre;
+const nuevoScore=(()=>{ let s=100; if(nuevoRatio>0.5)s-=40;else if(nuevoRatio>0.35)s-=25;else if(nuevoRatio>0.2)s-=10; if(nuevoFlujoFinal<0)s-=30;else if(nuevoFlujoFinal<ingreso*0.1)s-=15; if(d.mora.length>0)s-=20; return Math.max(0,Math.min(100,s)); })();
+const delta=nuevoScore-d.score;
+const scenarios=[
+{label:"Libero $20.000 en gastos",gasto:20000,pago:0,ing:0},
+{label:"Sumo $50.000 extra al pago",gasto:0,pago:50000,ing:0},
+{label:"Aumento de ingreso 15%",gasto:0,pago:0,ing:Math.round(ingreso*0.15)},
+{label:"Todo junto",gasto:20000,pago:50000,ing:Math.round(ingreso*0.1)},
 ];
-
-const aplicar = s => { setGastoExtra(s.gasto); setPagoExtra(s.pago); setIngresoExtra(s.ing); };
-
-return (
-<div>
-<p style={{ fontSize:13, color:C.muted, marginBottom:20, lineHeight:1.65, fontFamily:”‘DM Sans’,sans-serif” }}>
-Modificá los valores para ver cómo cambia tu situación financiera en tiempo real.
-</p>
-
-```
-{/* Escenarios rápidos */}
-<div style={{ fontSize:10, color:C.muted, fontFamily:"'Syne',sans-serif", letterSpacing:"0.06em", textTransform:"uppercase", marginBottom:10 }}>Escenarios rápidos</div>
-<div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:22 }}>
+return <div>
+<p style={{fontSize:13,color:C.muted,marginBottom:20,lineHeight:1.65,fontFamily:"'DM Sans',sans-serif"}}>Modificá los valores para ver cómo cambia tu situación financiera en tiempo real.</p>
+<div style={{fontSize:10,color:C.muted,fontFamily:"'Syne',sans-serif",letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:10}}>Escenarios rápidos</div>
+<div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:22}}>
 {scenarios.map(s=>(
-<button key={s.label} onClick={()=>aplicar(s)} style={{
-padding:"7px 14px", borderRadius:20, fontSize:12, cursor:"pointer",
-border:`1.5px solid ${C.border}`, background:"transparent",
-color:C.muted, fontFamily:"'Syne',sans-serif", fontWeight:600,
-transition:"all 0.2s",
-}}
+<button key={s.label} onClick={()=>{setGastoExtra(s.gasto);setPagoExtra(s.pago);setIngresoExtra(s.ing);}}
+style={{padding:"7px 14px",borderRadius:20,fontSize:12,cursor:"pointer",border:`1.5px solid ${C.border}`,background:"transparent",color:C.muted,fontFamily:"'Syne',sans-serif",fontWeight:600,transition:"all 0.2s"}}
 onMouseEnter={e=>{e.currentTarget.style.borderColor=C.accent;e.currentTarget.style.color=C.accent;}}
 onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.muted;}}>
 {s.label}
 </button>
 ))}
 </div>
-
-{/* Sliders / inputs */}
-<div style={{ background:"#090b0f", border:`1px solid ${C.border}`, borderRadius:12, padding:"18px 18px 4px", marginBottom:20 }}>
+<div style={{background:"#090b0f",border:`1px solid ${C.border}`,borderRadius:12,padding:"18px 18px 4px",marginBottom:20}}>
 {[
-{ label:"Reducción de gastos mensuales", value:gastoExtra, set:setGastoExtra, color:C.accent },
-{ label:"Pago extra mensual a deudas", value:pagoExtra, set:setPagoExtra, color:C.warn },
-{ label:"Ingreso adicional mensual", value:ingresoExtra, set:setIngresoExtra, color:"#00B4FF" },
+{label:"Reducción de gastos mensuales",value:gastoExtra,set:setGastoExtra,color:C.accent},
+{label:"Pago extra mensual a deudas",value:pagoExtra,set:setPagoExtra,color:C.warn},
+{label:"Ingreso adicional mensual",value:ingresoExtra,set:setIngresoExtra,color:"#00B4FF"},
 ].map(row=>(
-<div key={row.label} style={{ marginBottom:16 }}>
-<div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
-<span style={{ fontSize:11, color:C.subtle, fontFamily:"'Syne',sans-serif" }}>{row.label}</span>
-<span style={{ fontSize:12, color:row.color, fontWeight:700, fontFamily:"'Syne',sans-serif" }}>{fmt(parseFloat(row.value)||0)}</span>
+<div key={row.label} style={{marginBottom:16}}>
+<div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+<span style={{fontSize:11,color:C.subtle,fontFamily:"'Syne',sans-serif"}}>{row.label}</span>
+<span style={{fontSize:12,color:row.color,fontWeight:700,fontFamily:"'Syne',sans-serif"}}>{fmt(parseFloat(row.value)||0)}</span>
 </div>
-<div style={{ display:"flex", alignItems:"center", gap:10 }}>
-<input type="range" min="0" max={ingreso} step="5000" value={row.value}
-onChange={e=>row.set(e.target.value)}
-style={{ flex:1, accentColor:row.color, cursor:"pointer" }}/>
-<input type="number" value={row.value} onChange={e=>row.set(e.target.value)}
-style={{ width:100, background:"#13161D", border:`1.5px solid ${C.border}`, borderRadius:7, padding:"6px 8px", color:C.text, fontSize:12, outline:"none", fontFamily:"'DM Sans',sans-serif", textAlign:"right" }}/>
+<div style={{display:"flex",alignItems:"center",gap:10}}>
+<input type="range" min="0" max={ingreso} step="5000" value={row.value} onChange={e=>row.set(e.target.value)} style={{flex:1,accentColor:row.color,cursor:"pointer"}}/>
+<input type="number" value={row.value} onChange={e=>row.set(e.target.value)} style={{width:100,background:"#13161D",border:`1.5px solid ${C.border}`,borderRadius:7,padding:"6px 8px",color:C.text,fontSize:12,outline:"none",fontFamily:"'DM Sans',sans-serif",textAlign:"right"}}/>
 </div>
 </div>
 ))}
 </div>
-
-{/* Resultado */}
-<div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"18px 18px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+<div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:"18px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
 {[
-{ label:"Nuevo flujo libre", before:fmt(d.flujoLibre), after:fmt(nuevoFlujoFinal), better:nuevoFlujoFinal>d.flujoLibre },
-{ label:"Nuevo ratio deuda", before:fmtPct(d.ratio), after:fmtPct(nuevoRatio), better:nuevoRatio<d.ratio },
-{ label:"Score estimado", before:`${d.score}/100`, after:`${nuevoScore}/100`, better:deltaScore>=0 },
-{ label:"Mejora de flujo", before:"—", after:fmt(mejora), better:mejora>=0, hideLeft:true },
+{label:"Nuevo flujo libre",before:fmt(d.flujoLibre),after:fmt(nuevoFlujoFinal),better:nuevoFlujoFinal>d.flujoLibre},
+{label:"Nuevo ratio deuda",before:fmtPct(d.ratio),after:fmtPct(nuevoRatio),better:nuevoRatio<d.ratio},
+{label:"Score estimado",before:`${d.score}/100`,after:`${nuevoScore}/100`,better:delta>=0,showDelta:true},
+{label:"Mejora de flujo",before:"—",after:fmt(mejora),better:mejora>=0,hideLeft:true},
 ].map(row=>(
-<div key={row.label} style={{ background:"#090b0f", border:`1px solid ${C.border}`, borderRadius:10, padding:"13px 14px" }}>
-<div style={{ fontSize:10, color:C.muted, fontFamily:"'Syne',sans-serif", letterSpacing:"0.05em", marginBottom:8 }}>{row.label}</div>
-<div style={{ display:"flex", alignItems:"center", gap:8 }}>
-{!row.hideLeft && <span style={{ fontSize:13, color:"#4B5563", fontFamily:"'DM Serif Display',serif", textDecoration:"line-through" }}>{row.before}</span>}
-{!row.hideLeft && <span style={{ fontSize:11, color:"#4B5563" }}>→</span>}
-<span style={{ fontSize:16, fontWeight:700, fontFamily:"'DM Serif Display',serif", color:row.better?C.accent:C.danger }}>{row.after}</span>
-{deltaScore!==0&&row.label==="Score estimado" && (
-<span style={{ fontSize:11, color:deltaScore>0?C.accent:C.danger, fontFamily:"'Syne',sans-serif", fontWeight:700 }}>{deltaScore>0?"+":""}{deltaScore}</span>
-)}
+<div key={row.label} style={{background:"#090b0f",border:`1px solid ${C.border}`,borderRadius:10,padding:"13px 14px"}}>
+<div style={{fontSize:10,color:C.muted,fontFamily:"'Syne',sans-serif",letterSpacing:"0.05em",marginBottom:8}}>{row.label}</div>
+<div style={{display:"flex",alignItems:"center",gap:8}}>
+{!row.hideLeft&&<span style={{fontSize:13,color:"#4B5563",fontFamily:"'DM Serif Display',serif",textDecoration:"line-through"}}>{row.before}</span>}
+{!row.hideLeft&&<span style={{fontSize:11,color:"#4B5563"}}>→</span>}
+<span style={{fontSize:16,fontWeight:700,fontFamily:"'DM Serif Display',serif",color:row.better?C.accent:C.danger}}>{row.after}</span>
+{row.showDelta&&delta!==0&&<span style={{fontSize:11,color:delta>0?C.accent:C.danger,fontFamily:"'Syne',sans-serif",fontWeight:700}}>{delta>0?"+":""}{delta}</span>}
 </div>
 </div>
 ))}
 </div>
-</div>
-```
-
-);
+</div>;
 }
 
-// ─── TAB: PERFIL CREDITICIO ───────────────────────────────────────────────────
-function TabPerfil({ factores }) {
-return (
-<div>
-<p style={{ fontSize:13, color:C.muted, marginBottom:20, lineHeight:1.65, fontFamily:”‘DM Sans’,sans-serif” }}>
-Análisis de los factores que determinaron tu rechazo y qué necesitás mejorar para calificar.
-</p>
+function TabPerfil({factores}){
+return <div>
+<p style={{fontSize:13,color:C.muted,marginBottom:20,lineHeight:1.65,fontFamily:"'DM Sans',sans-serif"}}>Análisis de los factores que determinaron tu rechazo y qué necesitás mejorar para calificar.</p>
 {factores.map((f,i)=>{
-const col = estadoColor[f.estado]||C.accent;
-const ico = estadoIcon[f.estado]||”·”;
-return (
-<div key={i} style={{
-background: f.highlight?”#00E5A008”:”#090b0f”,
-border: `1.5px solid ${f.highlight?C.accent+"40":C.border}`,
-borderRadius:12, padding:“16px 18px”, marginBottom:12,
-}}>
-<div style={{ display:“flex”, alignItems:“center”, gap:10, marginBottom:10 }}>
-<div style={{ width:24, height:24, borderRadius:“50%”, background:`${col}20`, border:`1.5px solid ${col}60`, display:“flex”, alignItems:“center”, justifyContent:“center”, fontSize:11, fontWeight:800, color:col, fontFamily:”‘Syne’,sans-serif”, flexShrink:0 }}>{ico}</div>
-<span style={{ fontSize:14, fontWeight:700, color:f.highlight?C.accent:C.text, fontFamily:”‘DM Serif Display’,serif” }}>{f.nombre}</span>
-<span style={{ marginLeft:“auto”, fontSize:10, fontWeight:700, color:col, fontFamily:”‘Syne’,sans-serif”, letterSpacing:“0.07em”, textTransform:“uppercase”,
-background:`${col}18`, border:`1px solid ${col}40`, borderRadius:5, padding:“2px 8px” }}>
-{f.estado===“bien”?“OK”:f.estado===“regular”?“MEJORABLE”:“CRÍTICO”}
-</span>
+const col=estadoColor[f.estado]||C.accent;
+const ico=estadoIcon[f.estado]||"·";
+return <div key={i} style={{background:f.highlight?"#00E5A008":"#090b0f",border:`1.5px solid ${f.highlight?C.accent+"40":C.border}`,borderRadius:12,padding:"16px 18px",marginBottom:12}}>
+<div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+<div style={{width:24,height:24,borderRadius:"50%",background:`${col}20`,border:`1.5px solid ${col}60`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:col,fontFamily:"'Syne',sans-serif",flexShrink:0}}>{ico}</div>
+<span style={{fontSize:14,fontWeight:700,color:f.highlight?C.accent:C.text,fontFamily:"'DM Serif Display',serif"}}>{f.nombre}</span>
+<span style={{marginLeft:"auto",fontSize:10,fontWeight:700,color:col,fontFamily:"'Syne',sans-serif",letterSpacing:"0.07em",textTransform:"uppercase",background:`${col}18`,border:`1px solid ${col}40`,borderRadius:5,padding:"2px 8px"}}>{f.estado==="bien"?"OK":f.estado==="regular"?"MEJORABLE":"CRÍTICO"}</span>
 </div>
-<p style={{ fontSize:13, color:C.subtle, margin:“0 0 0 34px”, lineHeight:1.65, fontFamily:”‘DM Sans’,sans-serif” }}>{f.descripcion}</p>
-{f.accion && (
-<div style={{ marginTop:10, marginLeft:34, background:`${col}10`, border:`1px solid ${col}30`, borderRadius:7, padding:“8px 12px” }}>
-<span style={{ fontSize:12, color:col, fontFamily:”‘Syne’,sans-serif”, fontWeight:600 }}>→ {f.accion}</span>
-</div>
-)}
-</div>
-);
+<p style={{fontSize:13,color:C.subtle,margin:"0 0 0 34px",lineHeight:1.65,fontFamily:"'DM Sans',sans-serif"}}>{f.descripcion}</p>
+{f.accion&&<div style={{marginTop:10,marginLeft:34,background:`${col}10`,border:`1px solid ${col}30`,borderRadius:7,padding:"8px 12px"}}>
+<span style={{fontSize:12,color:col,fontFamily:"'Syne',sans-serif",fontWeight:600}}>→ {f.accion}</span>
+</div>}
+</div>;
 })}
-</div>
-);
+</div>;
 }
 
-// ─── MAIN ─────────────────────────────────────────────────────────────────────
-export default function CredizonaReset() {
-const [step, setStep] = useState(0);
-const [gastos, setGastos] = useState({});
-const [deudas, setDeudas] = useState([{ type:””, balance:””, minPayment:””, status:””, bank:”” }]);
-const [diag, setDiag] = useState(null);
-const [activeTab, setActiveTab] = useState(“resumen”);
-const [errors, setErrors] = useState({});
-const topRef = useRef(null);
+// ── APP PRINCIPAL ─────────────────────────────────────────────────────────
+function App(){
+const [step,setStep]=useState(0);
+const [gastos,setGastos]=useState({});
+const [deudas,setDeudas]=useState([{type:"",balance:"",minPayment:"",status:"",bank:""}]);
+const [diag,setDiag]=useState(null);
+const [activeTab,setActiveTab]=useState("resumen");
+const [errors,setErrors]=useState({});
+const topRef=useRef(null);
+const ingreso=PRE_LOADED.ingresoMensual;
+const totalGastoActual=Object.values(gastos).reduce((s,v)=>s+(parseFloat(v)||0),0);
 
-const ingreso = PRE_LOADED.ingresoMensual;
-const totalGastoActual = Object.values(gastos).reduce((s,v)=>s+(parseFloat(v)||0),0);
-
-const validate = () => {
-const e = {};
-if (step===0 && totalGastoActual===0) e.gastos = “Completá al menos un gasto fijo para continuar.”;
-if (step===1) deudas.forEach((d,i)=>{
-if (!d.type) e[`t${i}`]=“1”;
-if (!d.balance) e[`b${i}`]=“1”;
-if (!d.status) e[`s${i}`]=“1”;
-});
-setErrors(e);
-return !Object.keys(e).length;
+const validate=()=>{
+const e={};
+if(step===0&&totalGastoActual===0) e.gastos="Completá al menos un gasto fijo para continuar.";
+if(step===1) deudas.forEach((d,i)=>{ if(!d.type)e[`t${i}`]="1"; if(!d.balance)e[`b${i}`]="1"; if(!d.status)e[`s${i}`]="1"; });
+setErrors(e); return !Object.keys(e).length;
 };
 
-const next = () => {
-if (!validate()) return;
-if (step===1) {
-setDiag(calcularDiagnostico(ingreso, gastos, deudas));
-setStep(2);
-} else {
-setStep(s=>s+1);
-}
-setTimeout(()=>topRef.current?.scrollIntoView({behavior:“smooth”}),50);
+const next=()=>{
+if(!validate()) return;
+if(step===1){ setDiag(calcularDiagnostico(ingreso,gastos,deudas)); setStep(2); }
+else setStep(s=>s+1);
+setTimeout(()=>topRef.current?.scrollIntoView({behavior:"smooth"}),50);
 };
 
-const TABS = [
-{ id:“resumen”, label:“Resumen”, icon:“📊” },
-{ id:“plan”, label:“Plan de acción”, icon:“🎯” },
-{ id:“crono”, label:“Cronograma”, icon:“📅” },
-{ id:“sim”, label:“Simulador”, icon:“⚡” },
-{ id:“perfil”, label:“Perfil crediticio”, icon:“🏦” },
+const TABS=[
+{id:"resumen",label:"Resumen",icon:"📊"},
+{id:"plan",label:"Plan de acción",icon:"🎯"},
+{id:"crono",label:"Cronograma",icon:"📅"},
+{id:"sim",label:"Simulador",icon:"⚡"},
+{id:"perfil",label:"Perfil crediticio",icon:"🏦"},
 ];
 
-return (
-<>
-<style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap'); *{margin:0;padding:0;box-sizing:border-box;} body{background:#0D0F14;} input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;} input[type=range]{height:4px;} ::-webkit-scrollbar{width:4px;height:4px;} ::-webkit-scrollbar-track{background:#0D0F14;} ::-webkit-scrollbar-thumb{background:#1E2330;border-radius:4px;}`}</style>
-
-```
-<div ref={topRef} style={{
-minHeight:"100vh", background:"#0D0F14",
-backgroundImage:"radial-gradient(ellipse at 15% 0%,#00E5A009 0%,transparent 55%),radial-gradient(ellipse at 85% 100%,#00B4FF07 0%,transparent 55%)",
-paddingBottom:80,
-}}>
+return <div ref={topRef} style={{minHeight:"100vh",background:"#0D0F14",backgroundImage:"radial-gradient(ellipse at 15% 0%,#00E5A009 0%,transparent 55%),radial-gradient(ellipse at 85% 100%,#00B4FF07 0%,transparent 55%)",paddingBottom:80}}>
 
 {/* Header */}
-<div style={{ borderBottom:`1px solid ${C.border}`, padding:"16px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", background:"#0D0F14f0", backdropFilter:"blur(12px)", position:"sticky", top:0, zIndex:10 }}>
-<div style={{ display:"flex", alignItems:"center", gap:10 }}>
-<div style={{ width:30, height:30, borderRadius:8, background:"linear-gradient(135deg,#00E5A0,#00B4FF)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, fontWeight:900, color:"#0D0F14", fontFamily:"'Syne',sans-serif" }}>C</div>
-<span style={{ fontSize:15, fontWeight:700, color:C.text, fontFamily:"'Syne',sans-serif", letterSpacing:"-0.01em" }}>Credizona <span style={{color:C.accent}}>Reset</span></span>
+<div style={{borderBottom:`1px solid ${C.border}`,padding:"16px 24px",display:"flex",alignItems:"center",justifyContent:"space-between",background:"#0D0F14f0",backdropFilter:"blur(12px)",position:"sticky",top:0,zIndex:10}}>
+<div style={{display:"flex",alignItems:"center",gap:10}}>
+<div style={{width:30,height:30,borderRadius:8,background:"linear-gradient(135deg,#00E5A0,#00B4FF)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:900,color:"#0D0F14",fontFamily:"'Syne',sans-serif"}}>C</div>
+<span style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:"'Syne',sans-serif",letterSpacing:"-0.01em"}}>Credizona <span style={{color:C.accent}}>Reset</span></span>
 </div>
-<span style={{ fontSize:10, color:"#4B5563", fontFamily:"'Syne',sans-serif", letterSpacing:"0.07em", textTransform:"uppercase" }}>Diagnóstico financiero</span>
+<span style={{fontSize:10,color:"#4B5563",fontFamily:"'Syne',sans-serif",letterSpacing:"0.07em",textTransform:"uppercase"}}>Diagnóstico financiero</span>
 </div>
 
-<div style={{ maxWidth:680, margin:"0 auto", padding:"28px 18px 0" }}>
+<div style={{maxWidth:680,margin:"0 auto",padding:"28px 18px 0"}}>
 
 {/* Step pills */}
-{step<2 && (
-<div style={{ display:"flex", gap:8, marginBottom:28 }}>
+{step<2&&<div style={{display:"flex",gap:8,marginBottom:28}}>
 {["Gastos fijos","Tus deudas"].map((s,i)=>(
-<div key={s} style={{ display:"flex", alignItems:"center", gap:8 }}>
-<div style={{ display:"flex", alignItems:"center", gap:6, opacity:i>step?0.4:1, transition:"opacity 0.3s" }}>
-<div style={{ width:22, height:22, borderRadius:"50%", background:i<step?C.accent:i===step?"#00E5A018":"#181c28", border:`1.5px solid ${i<=step?C.accent:"#181c28"}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:800, color:i<step?"#0D0F14":C.accent, fontFamily:"'Syne',sans-serif" }}>{i<step?"✓":i+1}</div>
-<span style={{ fontSize:12, color:i===step?C.text:C.muted, fontWeight:i===step?600:400, fontFamily:"'Syne',sans-serif" }}>{s}</span>
+<div key={s} style={{display:"flex",alignItems:"center",gap:8}}>
+<div style={{display:"flex",alignItems:"center",gap:6,opacity:i>step?0.4:1,transition:"opacity 0.3s"}}>
+<div style={{width:22,height:22,borderRadius:"50%",background:i<step?C.accent:i===step?"#00E5A018":"#181c28",border:`1.5px solid ${i<=step?C.accent:"#181c28"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,color:i<step?"#0D0F14":C.accent,fontFamily:"'Syne',sans-serif"}}>{i<step?"✓":i+1}</div>
+<span style={{fontSize:12,color:i===step?C.text:C.muted,fontWeight:i===step?600:400,fontFamily:"'Syne',sans-serif"}}>{s}</span>
 </div>
-{i<1 && <div style={{width:20,height:1,background:"#181c28"}}/>}
+{i<1&&<div style={{width:20,height:1,background:"#181c28"}}/>}
 </div>
 ))}
-</div>
-)}
+</div>}
 
-{/* ── STEP 0: GASTOS ── */}
-{step===0 && (
-<>
-<div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, padding:"18px 20px", marginBottom:24 }}>
-<div style={{ fontSize:10, color:C.accent, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Syne',sans-serif", marginBottom:14 }}>📋 Datos de tu solicitud</div>
-<div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"0 16px" }}>
+{/* STEP 0 */}
+{step===0&&<>
+<div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"18px 20px",marginBottom:24}}>
+<div style={{fontSize:10,color:C.accent,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:"'Syne',sans-serif",marginBottom:14}}>📋 Datos de tu solicitud</div>
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
 <ReadOnly label="Nombre" value={PRE_LOADED.nombre}/>
 <ReadOnly label="DNI" value={PRE_LOADED.dni}/>
 <ReadOnly label="Email" value={PRE_LOADED.email}/>
@@ -781,93 +545,74 @@ paddingBottom:80,
 <ReadOnly label="Situación laboral" value={SITUACION_LABELS[PRE_LOADED.situacionLaboral]||PRE_LOADED.situacionLaboral}/>
 </div>
 </div>
-
-<h2 style={{ fontSize:21, color:C.text, fontFamily:"'DM Serif Display',serif", marginBottom:6 }}>¿Cuánto gastás por mes?</h2>
-<p style={{ fontSize:13, color:C.muted, marginBottom:22, lineHeight:1.65 }}>Completá tus gastos fijos. La precisión define la calidad del diagnóstico.</p>
-
-{errors.gastos && <div style={{ background:"#FF4D6D12", border:`1px solid #FF4D6D40`, borderRadius:8, padding:"10px 14px", marginBottom:14, fontSize:12, color:C.danger }}>⚠️ {errors.gastos}</div>}
-
-<div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, padding:"20px 20px 6px" }}>
-{EXPENSE_CATS.map(cat=>(
-<Field key={cat.key} label={cat.label} value={gastos[cat.key]||""} onChange={v=>setGastos(g=>({...g,[cat.key]:v}))} type="number" prefix="$" placeholder="0"/>
-))}
+<h2 style={{fontSize:21,color:C.text,fontFamily:"'DM Serif Display',serif",marginBottom:6}}>¿Cuánto gastás por mes?</h2>
+<p style={{fontSize:13,color:C.muted,marginBottom:22,lineHeight:1.65}}>Completá tus gastos fijos. La precisión define la calidad del diagnóstico.</p>
+{errors.gastos&&<div style={{background:"#FF4D6D12",border:`1px solid #FF4D6D40`,borderRadius:8,padding:"10px 14px",marginBottom:14,fontSize:12,color:C.danger}}>⚠️ {errors.gastos}</div>}
+<div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"20px 20px 6px"}}>
+{EXPENSE_CATS.map(cat=><Field key={cat.key} label={cat.label} value={gastos[cat.key]||""} onChange={v=>setGastos(g=>({...g,[cat.key]:v}))} type="number" prefix="$" placeholder="0"/>)}
 </div>
+{totalGastoActual>0&&<div style={{marginTop:14,background:"#00E5A00a",border:`1px solid #00E5A025`,borderRadius:10,padding:"13px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+<span style={{fontSize:12,color:C.muted,fontFamily:"'Syne',sans-serif"}}>Total gastos ingresados</span>
+<span style={{fontSize:17,fontWeight:700,fontFamily:"'DM Serif Display',serif",color:totalGastoActual>ingreso*0.9?C.danger:totalGastoActual>ingreso*0.7?C.warn:C.accent}}>{fmt(totalGastoActual)}</span>
+</div>}
+</>}
 
-{totalGastoActual>0 && (
-<div style={{ marginTop:14, background:"#00E5A00a", border:`1px solid #00E5A025`, borderRadius:10, padding:"13px 16px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-<span style={{ fontSize:12, color:C.muted, fontFamily:"'Syne',sans-serif" }}>Total gastos ingresados</span>
-<span style={{ fontSize:17, fontWeight:700, fontFamily:"'DM Serif Display',serif", color:totalGastoActual>ingreso*0.9?C.danger:totalGastoActual>ingreso*0.7?C.warn:C.accent }}>{fmt(totalGastoActual)}</span>
-</div>
-)}
-</>
-)}
-
-{/* ── STEP 1: DEUDAS ── */}
-{step===1 && (
-<>
-<h2 style={{ fontSize:21, color:C.text, fontFamily:"'DM Serif Display',serif", marginBottom:6 }}>Contanos tus deudas</h2>
-<p style={{ fontSize:13, color:C.muted, marginBottom:22, lineHeight:1.65 }}>Cargá cada deuda por separado. Si no sabés el saldo exacto, ingresá una estimación.</p>
-{deudas.map((d,i)=>(
-<DebtCard key={i} debt={d} index={i}
-onChange={v=>setDeudas(ds=>ds.map((x,idx)=>idx===i?v:x))}
-onRemove={()=>setDeudas(ds=>ds.filter((_,idx)=>idx!==i))}/>
-))}
+{/* STEP 1 */}
+{step===1&&<>
+<h2 style={{fontSize:21,color:C.text,fontFamily:"'DM Serif Display',serif",marginBottom:6}}>Contanos tus deudas</h2>
+<p style={{fontSize:13,color:C.muted,marginBottom:22,lineHeight:1.65}}>Cargá cada deuda por separado. Si no sabés el saldo exacto, ingresá una estimación.</p>
+{deudas.map((d,i)=><DebtCard key={i} debt={d} index={i} onChange={v=>setDeudas(ds=>ds.map((x,idx)=>idx===i?v:x))} onRemove={()=>setDeudas(ds=>ds.filter((_,idx)=>idx!==i))}/>)}
 <button onClick={()=>setDeudas(d=>[...d,{type:"",balance:"",minPayment:"",status:"",bank:""}])}
-style={{ width:"100%", background:"none", border:`1.5px dashed ${C.border}`, borderRadius:10, padding:"12px", color:C.muted, fontSize:12, cursor:"pointer", fontFamily:"'Syne',sans-serif", fontWeight:600, letterSpacing:"0.04em", transition:"all 0.2s" }}
+style={{width:"100%",background:"none",border:`1.5px dashed ${C.border}`,borderRadius:10,padding:"12px",color:C.muted,fontSize:12,cursor:"pointer",fontFamily:"'Syne',sans-serif",fontWeight:600,letterSpacing:"0.04em",transition:"all 0.2s"}}
 onMouseEnter={e=>{e.currentTarget.style.borderColor="#00E5A060";e.currentTarget.style.color=C.accent;}}
 onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.muted;}}>
 + Agregar otra deuda
 </button>
-</>
-)}
+</>}
 
-{/* ── STEP 2: DIAGNÓSTICO ── */}
-{step===2 && diag && (
-<>
-<div style={{ marginBottom:22 }}>
-<h2 style={{ fontSize:21, color:C.text, fontFamily:"'DM Serif Display',serif", marginBottom:4 }}>Tu diagnóstico, {PRE_LOADED.nombre.split(" ")[0]}</h2>
-<p style={{ fontSize:13, color:C.muted, fontFamily:"'DM Sans',sans-serif" }}>Revisá cada sección para entender tu situación y tu camino de salida.</p>
+{/* STEP 2 */}
+{step===2&&diag&&<>
+<div style={{marginBottom:22}}>
+<h2 style={{fontSize:21,color:C.text,fontFamily:"'DM Serif Display',serif",marginBottom:4}}>Tu diagnóstico, {PRE_LOADED.nombre.split(" ")[0]}</h2>
+<p style={{fontSize:13,color:C.muted,fontFamily:"'DM Sans',sans-serif"}}>Revisá cada sección para entender tu situación y tu camino de salida.</p>
 </div>
 <Tabs tabs={TABS} active={activeTab} onChange={setActiveTab}/>
-{activeTab==="resumen" && <TabResumen d={diag}/>}
-{activeTab==="plan" && <TabPlan acciones={diag.acciones}/>}
-{activeTab==="crono" && <TabCronograma cronograma={diag.cronograma} deudas={deudas} flujoLibre={diag.flujoLibre}/>}
-{activeTab==="sim" && <TabSimulador d={diag} ingreso={ingreso}/>}
-{activeTab==="perfil" && <TabPerfil factores={diag.perfilFactores}/>}
-
-{/* CTA */}
-<div style={{ marginTop:32, background:"linear-gradient(135deg,#00E5A010,#00B4FF08)", border:`1px solid #00E5A025`, borderRadius:16, padding:"24px 22px", textAlign:"center" }}>
-<div style={{ fontSize:19, fontFamily:"'DM Serif Display',serif", color:C.text, marginBottom:8 }}>¿Querés implementar este plan con un asesor?</div>
-<p style={{ fontSize:13, color:C.muted, lineHeight:1.65, maxWidth:380, margin:"0 auto 18px" }}>Un asesor de Credizona puede acompañarte en la negociación de deudas y armar un cronograma realista.</p>
-<button style={{ background:"linear-gradient(135deg,#00E5A0,#00C98A)", border:"none", borderRadius:10, padding:"13px 30px", fontSize:14, fontWeight:700, color:"#0D0F14", cursor:"pointer", fontFamily:"'Syne',sans-serif", letterSpacing:"0.02em", boxShadow:"0 4px 22px #00E5A028", transition:"transform 0.15s,box-shadow 0.15s" }}
+{activeTab==="resumen"&&<TabResumen d={diag}/>}
+{activeTab==="plan"&&<TabPlan acciones={diag.acciones}/>}
+{activeTab==="crono"&&<TabCronograma cronograma={diag.cronograma} deudas={deudas} flujoLibre={diag.flujoLibre}/>}
+{activeTab==="sim"&&<TabSimulador d={diag} ingreso={ingreso}/>}
+{activeTab==="perfil"&&<TabPerfil factores={diag.perfilFactores}/>}
+<div style={{marginTop:32,background:"linear-gradient(135deg,#00E5A010,#00B4FF08)",border:`1px solid #00E5A025`,borderRadius:16,padding:"24px 22px",textAlign:"center"}}>
+<div style={{fontSize:19,fontFamily:"'DM Serif Display',serif",color:C.text,marginBottom:8}}>¿Querés implementar este plan con un asesor?</div>
+<p style={{fontSize:13,color:C.muted,lineHeight:1.65,maxWidth:380,margin:"0 auto 18px"}}>Un asesor de Credizona puede acompañarte en la negociación de deudas y armar un cronograma realista.</p>
+<button style={{background:"linear-gradient(135deg,#00E5A0,#00C98A)",border:"none",borderRadius:10,padding:"13px 30px",fontSize:14,fontWeight:700,color:"#0D0F14",cursor:"pointer",fontFamily:"'Syne',sans-serif",letterSpacing:"0.02em",boxShadow:"0 4px 22px #00E5A028",transition:"transform 0.15s,box-shadow 0.15s"}}
 onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 30px #00E5A045";}}
 onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 4px 22px #00E5A028";}}>
 Hablar con un asesor →
 </button>
-<p style={{ fontSize:10, color:"#4B5563", marginTop:10, fontFamily:"'Syne',sans-serif" }}>📧 Diagnóstico enviado a {PRE_LOADED.email}</p>
+<p style={{fontSize:10,color:"#4B5563",marginTop:10,fontFamily:"'Syne',sans-serif"}}>📧 Diagnóstico enviado a {PRE_LOADED.email}</p>
 </div>
-</>
-)}
+</>}
 
-{/* Nav */}
-{step<2 && (
-<div style={{ display:"flex", justifyContent:"space-between", marginTop:24, alignItems:"center" }}>
+{/* Navegación */}
+{step<2&&<div style={{display:"flex",justifyContent:"space-between",marginTop:24,alignItems:"center"}}>
 {step>0
-? <button onClick={()=>setStep(s=>s-1)} style={{ background:"none", border:`1.5px solid ${C.border}`, borderRadius:9, padding:"11px 20px", color:C.muted, fontSize:13, cursor:"pointer", fontFamily:"'Syne',sans-serif", fontWeight:600, transition:"all 0.2s" }}
+?<button onClick={()=>setStep(s=>s-1)} style={{background:"none",border:`1.5px solid ${C.border}`,borderRadius:9,padding:"11px 20px",color:C.muted,fontSize:13,cursor:"pointer",fontFamily:"'Syne',sans-serif",fontWeight:600,transition:"all 0.2s"}}
 onMouseEnter={e=>{e.currentTarget.style.borderColor="#4B5563";e.currentTarget.style.color=C.subtle;}}
 onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.muted;}}>← Atrás</button>
-: <div/>}
-<button onClick={next} style={{ background:"linear-gradient(135deg,#00E5A0,#00C98A)", border:"none", borderRadius:9, padding:"12px 26px", fontSize:14, fontWeight:700, color:"#0D0F14", cursor:"pointer", fontFamily:"'Syne',sans-serif", letterSpacing:"0.02em", boxShadow:"0 4px 18px #00E5A022", transition:"transform 0.15s,box-shadow 0.15s" }}
+:<div/>}
+<button onClick={next} style={{background:"linear-gradient(135deg,#00E5A0,#00C98A)",border:"none",borderRadius:9,padding:"12px 26px",fontSize:14,fontWeight:700,color:"#0D0F14",cursor:"pointer",fontFamily:"'Syne',sans-serif",letterSpacing:"0.02em",boxShadow:"0 4px 18px #00E5A022",transition:"transform 0.15s,box-shadow 0.15s"}}
 onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 26px #00E5A040";}}
 onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 4px 18px #00E5A022";}}>
 {step===1?"Ver mi diagnóstico →":"Continuar →"}
 </button>
+</div>}
 </div>
-)}
-</div>
-</div>
-</>
-```
-
-);
+</div>;
 }
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App/>);
+</script>
+</body>
+</html>

@@ -682,6 +682,18 @@ function calcularPerfil(ratio, mora, score, flujoLibre, ingreso, deudas) {
 const fmt = n => "$"+Number(n||0).toLocaleString("es-UY",{maximumFractionDigits:0});
 const fmt_pct = n => Math.round((n||0)*100)+"%";
 function dias_desde(iso){ return Math.floor((Date.now()-new Date(iso).getTime())/86400000); }
+
+function nivelColor(n){
+  if(n==="A"||n==="MANEJABLE") return "#5cff70";
+  if(n==="B+") return "#9B72F0";
+  if(n==="B"||n==="EN RIESGO") return "#ffd447";
+  return "#ff7538";
+}
+function estado_color(e){ return e==="bien"?"#5cff70":e==="regular"?"#ffd447":"#ff7538"; }
+function estado_icon(e){ return e==="bien"?"&#10003;":e==="regular"?"~":"&#10005;"; }
+function estado_lbl(e){ return e==="bien"?"OK":e==="regular"?"MEJORABLE":"CRITICO"; }
+function deuda_color(s){ return (s==="en_mora"||s==="atraso_grave")?"#ff7538":s==="atraso_leve"?"#ffd447":"#5cff70"; }
+function deuda_lbl(s){ return s==="en_mora"?"En mora":s==="atraso_grave"?"Atraso grave":s==="atraso_leve"?"Atraso leve":"Al dia"; }
 // =============================================================================
 // CONFIGURACIÓN BACKEND — IT debe completar estas variables
 // =============================================================================

@@ -9,22 +9,43 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800;900&family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <style>
+:root{
+  --bg:#050914;
+  --bg2:#071225;
+  --panel:#0b1630;
+  --green:#5cff70;
+  --green2:#35d85e;
+  --text:#f7fbff;
+  --muted:#a9b4cc;
+  --danger:#ff7538;
+  --warn:#ffd447;
+  --line:rgba(255,255,255,.1);
+}
 *{margin:0;padding:0;box-sizing:border-box;}
-html,body{min-height:100vh;font-family:'DM Sans',sans-serif;}
+html,body{
+  min-height:100vh;
+  font-family:'DM Sans',Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(92,255,112,.12), transparent 28%),
+    radial-gradient(circle at 75% 10%, rgba(85,46,180,.22), transparent 26%),
+    linear-gradient(180deg,#050914 0%,#071225 55%,#050914 100%);
+  color:var(--text);
+  line-height:1.5;
+}
 input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 input[type=range]{height:4px;}
 select{appearance:none;}
-textarea{resize:vertical;font-family:'DM Sans',sans-serif;}
+textarea{resize:vertical;font-family:inherit;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:#050914;}
+::-webkit-scrollbar-thumb{background:#1a2540;border-radius:4px;}
 @keyframes spin{to{transform:rotate(360deg)}}
-@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
-.fade{animation:fadeUp 0.3s ease both;}
-.mode-light{background:#F4F7FC;color:#0F172A;}
-.mode-light input,.mode-light select,.mode-light textarea{color:#0F172A;}
-.mode-dark{background:#0A0C11;color:#E8ECF4;}
-.mode-dark ::-webkit-scrollbar-track{background:#0A0C11;}
-.mode-dark ::-webkit-scrollbar-thumb{background:#1E2433;border-radius:4px;}
-.skeleton{background:linear-gradient(90deg,#1C2030 25%,#252D3E 50%,#1C2030 75%);background-size:400px 100%;animation:shimmer 1.4s ease infinite;border-radius:8px;}
+  @keyframes pulseGreen{0%,100%{box-shadow:0 0 0 0 rgba(92,255,112,.3)}50%{box-shadow:0 0 0 8px rgba(92,255,112,0)}}
+@keyframes pulseGreen{0%,100%{box-shadow:0 0 0 0 rgba(92,255,112,.3)}50%{box-shadow:0 0 0 8px rgba(92,255,112,.0)}}
+.fade{animation:fadeUp 0.35s ease both;}
+.skeleton{background:linear-gradient(90deg,#0b1630 25%,#131f40 50%,#0b1630 75%);background-size:400px 100%;animation:shimmer 1.4s ease infinite;border-radius:8px;}
 </style>
 </head>
 <body>
@@ -117,27 +138,27 @@ const MORA_ORDER = {en_mora:0, atraso_grave:1, atraso_leve:2, al_dia:3};
 // DESIGN TOKENS
 // =============================================================================
 const C = {
-  bg:"#0A0C11", surface:"#0F1219", card:"#141820", border:"#1C2030", border2:"#252D3E",
-  accent:"#00D48C", aD:"#00D48C18", aB:"#00D48C40",
-  warn:"#F59E0B",   wD:"#F59E0B15", wB:"#F59E0B40",
-  danger:"#EF4444", dD:"#EF444415", dB:"#EF444440",
-  blue:"#4B8EF0",   bD:"#4B8EF015",
-  purple:"#9B72F0", pD:"#9B72F015", pB:"#9B72F040",
-  text:"#E8ECF4",   muted:"#566070", subtle:"#8090A8",
+  bg:"#050914", surface:"#071225", card:"#0b1630", border:"rgba(255,255,255,.10)", border2:"rgba(255,255,255,.18)",
+  accent:"#5cff70", aD:"rgba(92,255,112,.08)", aB:"rgba(92,255,112,.30)",
+  warn:"#ffd447",   wD:"rgba(255,212,71,.08)", wB:"rgba(255,212,71,.30)",
+  danger:"#ff7538", dD:"rgba(255,117,56,.08)", dB:"rgba(255,117,56,.30)",
+  blue:"#4B8EF0",   bD:"rgba(75,142,240,.1)",
+  purple:"#9B72F0", pD:"rgba(155,114,240,.1)", pB:"rgba(155,114,240,.3)",
+  text:"#f7fbff",   muted:"#a9b4cc", subtle:"#7a8aaa",
 };
 
 const NIVEL_COLOR = {A:C.accent, B:C.warn, "B+":C.purple, C:C.danger};
 const NIVEL_DIM   = {A:C.aD,     B:C.wD,   "B+":C.pD,     C:C.dD};
 const NIVEL_BORDER= {A:C.aB,     B:C.wB,   "B+":C.pB,     C:C.dB};
 
-// LIGHT design tokens (flujo de entrada)
+// Unified dark premium tokens
 const L = {
-  bg:"#F4F7FC", white:"#FFFFFF", border:"#E2E8F2", border2:"#CBD5E1",
-  text:"#0F172A", muted:"#64748B", subtle:"#94A3B8",
-  accent:"#059669", aD:"#ECFDF5", aB:"#A7F3D0",
-  warn:"#D97706",  wD:"#FFFBEB", wB:"#FDE68A",
-  danger:"#DC2626",dD:"#FEF2F2",dB:"#FECACA",
-  card:"#FFFFFF", surface:"#F4F7FC",
+  bg:"#050914", white:"#0b1630", border:"rgba(255,255,255,.1)", border2:"rgba(255,255,255,.16)",
+  text:"#f7fbff", muted:"#a9b4cc", subtle:"#7a8aaa",
+  accent:"#5cff70", aD:"rgba(92,255,112,.08)", aB:"rgba(92,255,112,.25)",
+  warn:"#ffd447",  wD:"rgba(255,212,71,.08)", wB:"rgba(255,212,71,.25)",
+  danger:"#ff7538", dD:"rgba(255,117,56,.08)", dB:"rgba(255,117,56,.25)",
+  card:"#0b1630", surface:"#071225",
 };
 
 const TIPO_META = {
@@ -829,7 +850,7 @@ function ScoreMeter({score, color}) {
 function Tabs({tabs, active, onChange}) {
   return <div style={{display:"flex", gap:4, overflowX:"auto", paddingBottom:4}}>
     {tabs.map(t=>(
-      <button key={t.id} onClick={()=>onChange(t.id)} style={{padding:"8px 14px", borderRadius:8, fontSize:11, fontWeight:700, fontFamily:"'Syne',sans-serif", cursor:"pointer", whiteSpace:"nowrap", border:"1.5px solid "+(active===t.id?C.accent:C.border), background:active===t.id?C.aD:"transparent", color:active===t.id?C.accent:C.muted, transition:"all 0.2s"}}>
+      <button key={t.id} onClick={()=>onChange(t.id)} style={{padding:"8px 14px", borderRadius:8, fontSize:11, fontWeight:700, fontFamily:"Inter,sans-serif", cursor:"pointer", whiteSpace:"nowrap", border:"1.5px solid "+(active===t.id?C.accent:C.border), background:active===t.id?C.aD:"transparent", color:active===t.id?C.accent:C.muted, transition:"all 0.2s"}}>
         {t.icon} {t.label}
       </button>
     ))}
@@ -848,7 +869,7 @@ function TabPlanReset({diag, onGoToTab}) {
 
   return <div className="fade">
     {/* Plan hero */}
-    <Card style={{padding:"22px 20px", marginBottom:14, border:"1px solid "+planColor+"30", background:planDim}}>
+    <Card style={{padding:"22px 20px", marginBottom:14, border:"2px solid "+planColor+"50", background:"linear-gradient(180deg,rgba(11,22,48,.96),rgba(8,18,38,.98))"}}>
       <div style={{display:"flex", alignItems:"center", gap:12, marginBottom:16}}>
         <div style={{fontSize:28}}>{plan.icon}</div>
         <div>
@@ -1264,46 +1285,46 @@ function TabPerfil({factores}) {
 // DEBT FORM CARD — version light para el flujo de entrada
 // =============================================================================
 function DebtFormCardLight({debt, index, onChange, onRemove}) {
-  return <div style={{background:L.white, border:"1.5px solid "+L.border, borderLeft:"3px solid "+L.aB, borderRadius:12, padding:"16px 18px 4px", marginBottom:12, boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+  return <div style={{background:"#0b1630", border:"1.5px solid rgba(255,255,255,.08)", borderLeft:"3px solid rgba(92,255,112,.3)", borderRadius:12, padding:"16px 18px 4px", marginBottom:12, boxShadow:"0 4px 20px rgba(0,0,0,.3)"}}>
     <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12}}>
-      <span style={{fontSize:10, color:L.accent, fontWeight:800, letterSpacing:"0.08em", fontFamily:"'Syne',sans-serif"}}>DEUDA #{index+1}</span>
-      <button onClick={onRemove} style={{background:"none", border:"none", color:L.subtle, cursor:"pointer", fontSize:20, lineHeight:1, transition:"color 0.2s"}}
-        onMouseEnter={e=>e.target.style.color=L.danger} onMouseLeave={e=>e.target.style.color=L.subtle}>x</button>
+      <span style={{fontSize:10, color:"#5cff70", fontWeight:900, letterSpacing:"0.08em", fontFamily:"'Syne',sans-serif"}}>DEUDA #{index+1}</span>
+      <button onClick={onRemove} style={{background:"none", border:"none", color:"#7a8aaa", cursor:"pointer", fontSize:20, lineHeight:1, transition:"color 0.2s"}}
+        onMouseEnter={e=>e.target.style.color="#ff7538"} onMouseLeave={e=>e.target.style.color=L.subtle}>x</button>
     </div>
     <div style={{marginBottom:16}}>
-      <div style={{fontSize:10, color:L.muted, letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Syne',sans-serif", marginBottom:5}}>Tipo de deuda</div>
+      <div style={{fontSize:10, color:"#7a8aaa", letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Syne',sans-serif", marginBottom:5}}>Tipo de deuda</div>
       <select value={debt.type} onChange={e=>onChange({...debt,type:e.target.value})}
-        style={{width:"100%", background:L.surface, border:"1.5px solid "+L.border, borderRadius:9, padding:"11px 13px", color:debt.type?L.text:L.subtle, fontSize:14, outline:"none", cursor:"pointer", transition:"border 0.2s"}}
-        onFocus={e=>e.target.style.borderColor=L.accent} onBlur={e=>e.target.style.borderColor=L.border}>
+        style={{width:"100%", background:"#071225", border:"1.5px solid rgba(255,255,255,.1)", borderRadius:9, padding:"11px 13px", color:debt.type?"#f7fbff":"#7a8aaa", fontSize:14, outline:"none", cursor:"pointer", transition:"border 0.2s"}}
+        onFocus={e=>e.target.style.borderColor="#5cff70"} onBlur={e=>e.target.style.borderColor="rgba(255,255,255,.1)"}>
         <option value="">Selecciona...</option>
         {DEBT_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
       </select>
     </div>
     {(debt.type==="Tarjeta de credito"||debt.type==="Prestamo personal"||debt.type==="Casa financiera")&&
       <div style={{marginBottom:16}}>
-        <div style={{fontSize:10, color:L.muted, letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Syne',sans-serif", marginBottom:5}}>Banco / Entidad</div>
+        <div style={{fontSize:10, color:"#7a8aaa", letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Syne',sans-serif", marginBottom:5}}>Banco / Entidad</div>
         <input value={debt.bank||""} onChange={e=>onChange({...debt,bank:e.target.value})} placeholder="Ej: BROU, Santander..."
-          style={{width:"100%", boxSizing:"border-box", background:L.surface, border:"1.5px solid "+L.border, borderRadius:9, padding:"11px 13px", color:"#0F172A", fontSize:14, outline:"none", fontWeight:500, transition:"border 0.2s"}}
-          onFocus={e=>e.target.style.borderColor=L.accent} onBlur={e=>e.target.style.borderColor=L.border}/>
+          style={{width:"100%", boxSizing:"border-box", background:"#071225", border:"1.5px solid rgba(255,255,255,.1)", borderRadius:9, padding:"11px 13px", color:"#0F172A", fontSize:14, outline:"none", fontWeight:500, transition:"border 0.2s"}}
+          onFocus={e=>e.target.style.borderColor="#5cff70"} onBlur={e=>e.target.style.borderColor="rgba(255,255,255,.1)"}/>
       </div>}
     <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10}}>
       {[["Saldo total","balance"],["Pago minimo/mes","minPayment"]].map(([lbl,key])=>(
         <div key={key} style={{marginBottom:16}}>
-          <div style={{fontSize:10, color:L.muted, letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Syne',sans-serif", marginBottom:5}}>{lbl}</div>
+          <div style={{fontSize:10, color:"#7a8aaa", letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Syne',sans-serif", marginBottom:5}}>{lbl}</div>
           <div style={{position:"relative"}}>
-            <span style={{position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", color:L.accent, fontSize:13, fontWeight:700}}>$</span>
+            <span style={{position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", color:"#5cff70", fontSize:13, fontWeight:700}}>$</span>
             <input type="number" value={debt[key]||""} onChange={e=>onChange({...debt,[key]:e.target.value})} placeholder="0"
-              style={{width:"100%", boxSizing:"border-box", background:L.surface, border:"1.5px solid "+L.border, borderRadius:9, padding:"11px 13px 11px 27px", color:"#0F172A", fontSize:14, outline:"none", fontWeight:500, transition:"border 0.2s"}}
-              onFocus={e=>e.target.style.borderColor=L.accent} onBlur={e=>e.target.style.borderColor=L.border}/>
+              style={{width:"100%", boxSizing:"border-box", background:"#071225", border:"1.5px solid rgba(255,255,255,.1)", borderRadius:9, padding:"11px 13px 11px 27px", color:"#f7fbff", fontSize:14, outline:"none", fontWeight:500, transition:"border 0.2s"}}
+              onFocus={e=>e.target.style.borderColor="#5cff70"} onBlur={e=>e.target.style.borderColor="rgba(255,255,255,.1)"}/>
           </div>
         </div>
       ))}
     </div>
     <div style={{marginBottom:16}}>
-      <div style={{fontSize:10, color:L.muted, letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Syne',sans-serif", marginBottom:5}}>Estado</div>
+      <div style={{fontSize:10, color:"#7a8aaa", letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Syne',sans-serif", marginBottom:5}}>Estado</div>
       <select value={debt.status} onChange={e=>onChange({...debt,status:e.target.value})}
-        style={{width:"100%", background:L.surface, border:"1.5px solid "+L.border, borderRadius:9, padding:"11px 13px", color:debt.status?L.text:L.subtle, fontSize:14, outline:"none", cursor:"pointer", transition:"border 0.2s"}}
-        onFocus={e=>e.target.style.borderColor=L.accent} onBlur={e=>e.target.style.borderColor=L.border}>
+        style={{width:"100%", background:"#071225", border:"1.5px solid rgba(255,255,255,.1)", borderRadius:9, padding:"11px 13px", color:debt.status?"#f7fbff":"#7a8aaa", fontSize:14, outline:"none", cursor:"pointer", transition:"border 0.2s"}}
+        onFocus={e=>e.target.style.borderColor="#5cff70"} onBlur={e=>e.target.style.borderColor="rgba(255,255,255,.1)"}>
         <option value="">Selecciona...</option>
         <option value="al_dia">Al dia</option>
         <option value="atraso_leve">Atraso leve (1-60 dias)</option>
@@ -1425,7 +1446,7 @@ function App() {
   } : {color:C.accent};
 
   const isDash = step===2;
-  return <div ref={topRef} className={isDash?"mode-dark":"mode-light"} style={{minHeight:"100vh", backgroundImage:isDash?"radial-gradient(ellipse at 15% 0%,"+C.aD+" 0%,transparent 55%),radial-gradient(ellipse at 85% 100%,"+C.bD+" 0%,transparent 55%)":"none", paddingBottom:100}}>
+  return <div ref={topRef} style={{minHeight:"100vh", paddingBottom:100}}>
 
     {/* MODAL RESET */}
     {showReset&&<div style={{position:"fixed", inset:0, background:"rgba(0,0,0,0.75)", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:20}}>
@@ -1440,43 +1461,43 @@ function App() {
     </div>}
 
     {/* HEADER — light en formularios, dark en dashboard */}
-    <div style={{background:isDash?C.surface+"F0":"#FFFFFFEE", borderBottom:"1px solid "+(isDash?C.border:L.border), padding:"14px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, zIndex:10, backdropFilter:"blur(12px)"}}>
+    <div style={{background:"rgba(5,9,20,.88)", borderBottom:"1px solid rgba(255,255,255,.07)", padding:"14px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, zIndex:10, backdropFilter:"blur(12px)"}}>
       <div style={{display:"flex", alignItems:"center", gap:10}}>
         {/* Logo oficial Credizona */}
         <div style={{display:"flex", alignItems:"center", gap:8}}>
           <img
             src="https://www.credizona.com.uy/imagenes/LogoHeader.svg"
             alt="Credizona"
-            style={{height:28, display:"block", filter:isDash?"brightness(0) invert(1)":"none"}}
+            style={{height:28, display:"block", filter:"brightness(0) invert(1)"}}
           />
-          <div style={{width:1, height:16, background:isDash?"#334155":"#CBD5E1"}}/>
-          <span style={{fontSize:12, fontWeight:800, color:isDash?C.accent:"#059669", fontFamily:"'Syne',sans-serif", letterSpacing:"0.1em", textTransform:"uppercase"}}>RESET</span>
+          <div style={{width:1, height:16, background:"rgba(255,255,255,.15)"}}/>
+          <span style={{fontSize:12, fontWeight:800, color:C.accent, fontFamily:"'Syne',sans-serif", letterSpacing:"0.1em", textTransform:"uppercase"}}>RESET</span>
         </div>
       </div>
       <div style={{display:"flex", alignItems:"center", gap:12}}>
-        {step===2&&iaLoading&&<span style={{fontSize:11, color:C.accent, fontFamily:"'Syne',sans-serif", display:"flex", alignItems:"center", gap:6}}><span style={{width:10,height:10,border:"1.5px solid "+C.accent+"40",borderTop:"1.5px solid "+C.accent,borderRadius:"50%",display:"inline-block",animation:"spin 0.8s linear infinite"}}/>IA generando...</span>}
-        {step===2&&fechaGuardada&&<span style={{fontSize:11, color:C.muted, fontFamily:"'Syne',sans-serif"}}>Guardado {fechaGuardada}</span>}
+        {step===2&&iaLoading&&<span style={{fontSize:11, color:"#5cff70", fontFamily:"'Syne',sans-serif", display:"flex", alignItems:"center", gap:6}}><span style={{width:10,height:10,border:"1.5px solid "+C.accent+"40",borderTop:"1.5px solid "+C.accent,borderRadius:"50%",display:"inline-block",animation:"spin 0.8s linear infinite"}}/>IA generando...</span>}
+        {step===2&&fechaGuardada&&<span style={{fontSize:11, color:"#a9b4cc", fontFamily:"'Syne',sans-serif"}}>Guardado {fechaGuardada}</span>}
         {step===2&&<button onClick={()=>setShowReset(true)}
           style={{fontSize:11, color:C.muted, background:"none", border:"1px solid "+C.border, borderRadius:7, padding:"5px 12px", cursor:"pointer", fontFamily:"'Syne',sans-serif", fontWeight:600, transition:"all 0.2s"}}
           onMouseEnter={e=>{e.currentTarget.style.borderColor=C.danger;e.currentTarget.style.color=C.danger;}}
           onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.muted;}}>
           Nuevo
         </button>}
-        {!isDash&&<span style={{fontSize:10, color:L.muted, fontFamily:"'Syne',sans-serif", textTransform:"uppercase", letterSpacing:"0.07em"}}>Motor Reset v2</span>}
+        {step!==2&&<span style={{fontSize:10, color:"#a9b4cc", fontFamily:"'Syne',sans-serif", textTransform:"uppercase", letterSpacing:"0.07em"}}>Motor Reset v2</span>}
       </div>
     </div>
 
-    <div style={{maxWidth:760, margin:"0 auto", padding:"28px 18px 0", color:isDash?C.text:L.text}}>
+    <div style={{maxWidth:760, margin:"0 auto", padding:"28px 18px 0"}}>
 
       {/* STEP PILLS */}
       {step<2&&<div style={{display:"flex", gap:8, marginBottom:28, alignItems:"center"}}>
         {["Gastos fijos","Tus deudas"].map((s,i)=>(
           <div key={s} style={{display:"flex", alignItems:"center", gap:8}}>
             <div style={{display:"flex", alignItems:"center", gap:6, opacity:i>step?0.4:1, transition:"opacity 0.3s"}}>
-              <div style={{width:24, height:24, borderRadius:"50%", background:i<step?L.accent:i===step?L.aD:L.border, border:"2px solid "+(i<=step?L.accent:L.border), display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:800, color:i<step?"#fff":L.accent, fontFamily:"'Syne',sans-serif"}}>{i<step?"v":i+1}</div>
-              <span style={{fontSize:12, color:i===step?L.text:L.muted, fontWeight:i===step?700:400, fontFamily:"'Syne',sans-serif"}}>{s}</span>
+              <div style={{width:24, height:24, borderRadius:"50%", background:i<step?"#5cff70":i===step?"rgba(92,255,112,.1)":"rgba(255,255,255,.06)", border:"1.5px solid "+(i<=step?"#5cff70":"rgba(255,255,255,.1)"), display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:800, color:i<step?"#050914":"#5cff70", fontFamily:"Inter,sans-serif"}}>{i<step?"✓":i+1}</div>
+              <span style={{fontSize:12, color:i===step?"#f7fbff":"#a9b4cc", fontWeight:i===step?900:600, fontFamily:"Inter,sans-serif"}}>{s}</span>
             </div>
-            {i<1&&<div style={{width:24, height:1, background:L.border}}/>}
+            {i<1&&<div style={{width:24, height:1, background:"rgba(255,255,255,.15)"}}/>}
           </div>
         ))}
       </div>}
@@ -1490,184 +1511,80 @@ function App() {
           return <div style={{background:col+"15", border:"1px solid "+col+"40", borderRadius:12, padding:"12px 16px", marginBottom:20, display:"flex", gap:10, alignItems:"center"}}>
             <div style={{fontSize:10, fontWeight:800, color:col, fontFamily:"'Syne',sans-serif", letterSpacing:"0.05em"}}>ENCUESTA: NIVEL {enc.nivel} — {enc.score}/100</div>
             {enc.bPlus&&<Tag color={C.purple}>B+</Tag>}
-            {enc.flagsRiesgo.length>0&&<div style={{fontSize:10, color:L.muted}}>{enc.flagsRiesgo.length} flag(s) de riesgo detectados</div>}
+            {enc.flagsRiesgo.length>0&&<div style={{fontSize:10, color:"#a9b4cc"}}>{enc.flagsRiesgo.length} flag(s) de riesgo detectados</div>}
           </div>;
         })()}
 
         {/* ── HERO BANNER ────────────────────────────────────────────────── */}
-        <div style={{marginBottom:28}}>
+        <div style={{marginBottom:32}}>
 
-          {/* Badge gratis */}
-          <div style={{display:"flex", justifyContent:"center", marginBottom:18}}>
-            <div style={{display:"inline-flex", alignItems:"center", gap:7, background:"#ECFDF5", border:"1.5px solid #6EE7B7", borderRadius:20, padding:"5px 14px"}}>
-              <span style={{width:7, height:7, borderRadius:"50%", background:"#059669", display:"inline-block", flexShrink:0}}/>
-              <span style={{fontSize:12, fontWeight:800, color:"#065F46", fontFamily:"'Syne',sans-serif", letterSpacing:"0.03em"}}>
-                100% gratis — sin registrarte, sin tarjeta
-              </span>
+          {/* Kicker pill con punto pulsante */}
+          <div style={{display:"flex", justifyContent:"center", marginBottom:20}}>
+            <div style={{display:"inline-flex", alignItems:"center", gap:10, border:"1px solid rgba(92,255,112,.28)", color:"#5cff70", background:"rgba(92,255,112,.08)", borderRadius:999, padding:"9px 16px", fontWeight:900, fontSize:13, textTransform:"uppercase", letterSpacing:"0.04em", fontFamily:"Inter,sans-serif"}}>
+              <span style={{width:7, height:7, borderRadius:"50%", background:"#5cff70", display:"inline-block", animation:"pulseGreen 2s ease infinite", flexShrink:0}}/>
+              Diagnostico financiero gratuito
             </div>
           </div>
 
-          {/* Headline principal */}
-          <div style={{background:"linear-gradient(160deg,#0F172A 0%,#1E3A5F 100%)", borderRadius:20, padding:"32px 24px 28px", marginBottom:12, position:"relative", overflow:"hidden"}}>
-            {/* Decoracion */}
-            <div style={{position:"absolute", top:-40, right:-40, width:180, height:180, borderRadius:"50%", background:"#00D48C08", pointerEvents:"none"}}/>
-            <div style={{position:"absolute", bottom:-30, left:-30, width:120, height:120, borderRadius:"50%", background:"#4B8EF008", pointerEvents:"none"}}/>
+          {/* Hero principal — borde verde como en la landing */}
+          <div style={{border:"2px solid rgba(92,255,112,.35)", borderRadius:24, background:"linear-gradient(180deg,rgba(11,22,48,.96) 0%,rgba(8,18,40,.98) 100%)", boxShadow:"0 30px 80px rgba(0,0,0,.45)", padding:"36px 28px 32px", marginBottom:14, position:"relative", overflow:"hidden"}}>
+            <div style={{position:"absolute", top:-60, left:-60, width:240, height:240, borderRadius:"50%", background:"rgba(92,255,112,.07)", pointerEvents:"none"}}/>
+            <div style={{position:"absolute", top:-40, right:-40, width:180, height:180, borderRadius:"50%", background:"rgba(85,46,180,.15)", pointerEvents:"none"}}/>
 
             <div style={{position:"relative", zIndex:1}}>
-              <div style={{display:"flex", alignItems:"center", gap:8, marginBottom:12}}>
-                <img
-                  src="https://www.credizona.com.uy/imagenes/LogoHeader.svg"
-                  alt="Credizona"
-                  style={{height:20, display:"block", filter:"brightness(0) invert(1)"}}
-                />
-                <div style={{width:1, height:14, background:"#FFFFFF30"}}/>
-                <span style={{fontSize:11, fontWeight:800, color:"#6EE7B7", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Syne',sans-serif"}}>RESET</span>
+              {/* Logo */}
+              <div style={{display:"flex", alignItems:"center", gap:8, marginBottom:20}}>
+                <img src="https://www.credizona.com.uy/imagenes/LogoHeader.svg" alt="Credizona" style={{height:18, filter:"brightness(0) invert(1)", opacity:0.9}}/>
+                <div style={{width:1, height:12, background:"rgba(255,255,255,.2)"}}/>
+                <span style={{fontSize:11, fontWeight:900, color:"#5cff70", letterSpacing:"0.12em", textTransform:"uppercase", fontFamily:"Inter,sans-serif"}}>RESET</span>
               </div>
-              <h1 style={{fontSize:"clamp(22px,4.5vw,30px)", fontFamily:"'DM Serif Display',serif", color:"#F8FAFC", lineHeight:1.2, marginBottom:14}}>
-                Entende donde estas.<br/>
-                <span style={{color:"#34D399"}}>Sabe como salir.</span>
+
+              {/* H1 uppercase bold como en la landing */}
+              <h1 style={{fontSize:"clamp(26px,4.5vw,40px)", fontFamily:"Inter,sans-serif", fontWeight:900, color:"#f7fbff", lineHeight:0.97, letterSpacing:"-0.05em", textTransform:"uppercase", marginBottom:16}}>
+                ENTENDE DONDE ESTAS.<br/>
+                <span style={{color:"#5cff70"}}>SABE COMO SALIR.</span>
               </h1>
-              <p style={{fontSize:14, color:"#94A3B8", lineHeight:1.7, marginBottom:20, maxWidth:420}}>
-                Carga tus gastos y deudas en 5 minutos. Nuestro sistema analiza tu situacion real y te dice exactamente que hacer primero — sin vueltas, sin letra chica.
+
+              <p style={{fontSize:16, color:"#d5dbea", lineHeight:1.65, marginBottom:24, maxWidth:480}}>
+                Carga tus gastos y deudas en 5 minutos. El sistema analiza tu situacion real con inteligencia artificial y te dice exactamente que hacer primero.
               </p>
 
-              {/* Pasos inline */}
-              <div style={{display:"flex", gap:0, flexWrap:"nowrap", overflowX:"auto"}}>
-                {[
-                  {n:"1", texto:"Cargas tus datos"},
-                  {n:"2", texto:"El sistema analiza"},
-                  {n:"3", texto:"Recibis tu plan"},
-                ].map((p,i)=>(
-                  <div key={i} style={{display:"flex", alignItems:"center", gap:0, flexShrink:0}}>
-                    <div style={{display:"flex", alignItems:"center", gap:8, background:"#FFFFFF12", borderRadius:10, padding:"8px 14px"}}>
-                      <div style={{width:22, height:22, borderRadius:"50%", background:"#34D39930", border:"1.5px solid #34D39960", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:900, color:"#34D399", flexShrink:0}}>{p.n}</div>
-                      <span style={{fontSize:12, color:"#CBD5E1", fontWeight:500, whiteSpace:"nowrap"}}>{p.texto}</span>
+              {/* Pasos estilo landing */}
+              <div style={{display:"flex", gap:6, flexWrap:"wrap", marginBottom:24}}>
+                {[{n:"1",t:"Cargas tus datos"},{n:"2",t:"El sistema analiza"},{n:"3",t:"Recibis tu plan"}].map((p,i)=>(
+                  <div key={i} style={{display:"flex", alignItems:"center", gap:6, flexShrink:0}}>
+                    <div style={{display:"flex", alignItems:"center", gap:8, background:"rgba(255,255,255,.06)", border:"1px solid rgba(255,255,255,.08)", borderRadius:10, padding:"7px 12px"}}>
+                      <div style={{width:22, height:22, borderRadius:"50%", background:"var(--green,#5cff70)", color:"#041008", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:900, flexShrink:0}}>{p.n}</div>
+                      <span style={{fontSize:12, color:"#cbd5e1", fontWeight:700, whiteSpace:"nowrap"}}>{p.t}</span>
                     </div>
-                    {i<2&&<span style={{color:"#334155", fontSize:14, padding:"0 4px"}}>›</span>}
+                    {i<2&&<span style={{color:"rgba(255,255,255,.25)", fontSize:18}}>&#8250;</span>}
                   </div>
                 ))}
               </div>
+
+              {/* Free + security */}
+              <div style={{display:"flex", gap:16, alignItems:"center", flexWrap:"wrap"}}>
+                <div style={{display:"inline-flex", alignItems:"center", gap:8, background:"rgba(92,255,112,.12)", border:"1.5px solid rgba(92,255,112,.35)", borderRadius:10, padding:"8px 14px"}}>
+                  <span style={{fontSize:15}}>&#127358;</span>
+                  <span style={{fontSize:13, fontWeight:900, color:"#5cff70", fontFamily:"Inter,sans-serif", letterSpacing:"0.02em"}}>100% GRATIS</span>
+                </div>
+                <span style={{fontSize:13, color:"#7a8aaa", display:"flex", alignItems:"center", gap:6}}>&#128274; Tus datos son privados y seguros</span>
+              </div>
             </div>
           </div>
 
-          {/* Chips de confianza */}
-          <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
+          {/* Pain grid 2x2 — estilo landing */}
+          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10}}>
             {[
-              {icon:"🔒", texto:"Tus datos son privados"},
-              {icon:"⏱️", texto:"5 minutos"},
-              {icon:"📊", texto:"Plan personalizado"},
-              {icon:"🆓", texto:"Sin costo"},
-            ].map(p=>(
-              <div key={p.texto} style={{display:"flex", alignItems:"center", gap:6, background:"#FFFFFF", border:"1px solid #E2E8F2", borderRadius:20, padding:"6px 12px", boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
-                <span style={{fontSize:12}}>{p.icon}</span>
-                <span style={{fontSize:11, color:"#334155", fontWeight:600}}>{p.texto}</span>
+              {icon:"&#9785;", t:"Pagas pero no sales de las deudas"},
+              {icon:"&#10005;", t:"Te rechazan y no saben explicarte por que"},
+              {icon:"&#128269;", t:"No entendes que dice tu perfil crediticio"},
+              {icon:"&#128203;", t:"Nunca tuviste un plan claro para salir"},
+            ].map((p,i)=>(
+              <div key={i} style={{display:"flex", alignItems:"center", gap:10, background:"rgba(255,255,255,.04)", border:"1px solid rgba(255,255,255,.07)", borderRadius:12, padding:"11px 14px"}}>
+                <span style={{fontSize:18, flexShrink:0}} dangerouslySetInnerHTML={{__html:p.icon}}/>
+                <span style={{fontSize:12, color:"#a9b4cc", fontWeight:700, lineHeight:1.4}}>{p.t}</span>
               </div>
             ))}
           </div>
         </div>
-
-        <div style={{background:L.white, border:"1px solid "+L.border, borderRadius:14, padding:"20px 22px", marginBottom:22, boxShadow:"0 1px 6px rgba(0,0,0,0.06)"}}>
-          <div style={{fontSize:10, color:C.accent, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Syne',sans-serif", marginBottom:14}}>Datos de tu solicitud</div>
-          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:"0 20px"}}>
-            {[["Nombre",PRE.nombre],["Cedula",PRE.cedula],["Email",PRE.email],["Ingreso mensual",fmt(PRE.ingresoMensual)],["Situacion laboral",SITUACION_LABELS[PRE.situacionLaboral]||PRE.situacionLaboral],["Motivo de rechazo",MOTIVO_LABELS[PRE.motivoRechazo]||PRE.motivoRechazo]].map(([lbl,val])=>(
-              <div key={lbl} style={{marginBottom:14}}>
-                <div style={{fontSize:10, color:L.muted, letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Syne',sans-serif", marginBottom:4}}>{lbl}</div>
-                <div style={{background:L.surface, border:"1px solid "+L.border, borderRadius:9, padding:"10px 13px", color:"#334155", fontSize:14, fontWeight:500}}>{val}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <h2 style={{fontSize:22, color:L.text, fontFamily:"'DM Serif Display',serif", marginBottom:6}}>Cuanto gastas por mes?</h2>
-        <p style={{fontSize:13, color:L.muted, marginBottom:22, lineHeight:1.65}}>Completa tus gastos fijos. La precision define la calidad del plan.</p>
-        {errors.gastos&&<div style={{background:L.dD, border:"1px solid "+L.dB, borderRadius:8, padding:"10px 14px", marginBottom:14, fontSize:12, color:L.danger}}>Completa al menos un gasto fijo.</div>}
-        <div style={{background:L.white, border:"1px solid "+L.border, borderRadius:14, padding:"20px 22px 6px", marginBottom:14, boxShadow:"0 1px 6px rgba(0,0,0,0.06)"}}>
-          {EXPENSE_CATS.map(cat=>(
-            <div key={cat.key} style={{marginBottom:16}}>
-              <div style={{fontSize:10, color:L.muted, letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Syne',sans-serif", marginBottom:5}}>{cat.label}</div>
-              <div style={{position:"relative"}}>
-                <span style={{position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", color:L.accent, fontSize:13, fontWeight:700}}>$</span>
-                <input type="number" value={gastos[cat.key]||""} onChange={e=>setGastos(g=>({...g,[cat.key]:e.target.value}))} placeholder="0"
-                  style={{width:"100%", boxSizing:"border-box", background:L.surface, border:"1.5px solid "+L.border, borderRadius:9, padding:"11px 13px 11px 27px", color:L.text, fontSize:14, outline:"none", transition:"border 0.2s"}}
-                  onFocus={e=>e.target.style.borderColor=L.accent} onBlur={e=>e.target.style.borderColor=L.border}/>
-              </div>
-            </div>
-          ))}
-        </div>
-        {totalGastoActual>0&&<div style={{background:L.aD, border:"1px solid "+L.aB, borderRadius:10, padding:"13px 18px", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-          <span style={{fontSize:12, color:L.muted, fontFamily:"'Syne',sans-serif"}}>Total gastos ingresados</span>
-          <span style={{fontSize:19, fontWeight:700, fontFamily:"'DM Serif Display',serif", color:totalGastoActual>ingreso*0.9?L.danger:totalGastoActual>ingreso*0.7?L.warn:L.accent}}>{fmt(totalGastoActual)}</span>
-        </div>}
-      </div>}
-
-      {/* STEP 1: DEUDAS */}
-      {step===1&&<div className="fade">
-        <h2 style={{fontSize:22, color:L.text, fontFamily:"'DM Serif Display',serif", marginBottom:6}}>Carga tus deudas</h2>
-        <p style={{fontSize:13, color:L.muted, marginBottom:22, lineHeight:1.65}}>Una por una. Si no sabes el saldo exacto, ingresa una estimacion.</p>
-        {deudas.map((d,i)=><DebtFormCardLight key={i} debt={d} index={i} onChange={v=>setDeudas(ds=>ds.map((x,idx)=>idx===i?v:x))} onRemove={()=>setDeudas(ds=>ds.filter((_,idx)=>idx!==i))}/>)}
-        <button onClick={()=>setDeudas(d=>[...d,{type:"",balance:"",minPayment:"",status:"",bank:""}])}
-          style={{width:"100%", background:"none", border:"1.5px dashed "+L.border, borderRadius:10, padding:"12px", color:L.muted, fontSize:12, cursor:"pointer", fontFamily:"'Syne',sans-serif", fontWeight:700, transition:"all 0.2s"}}
-          onMouseEnter={e=>{e.currentTarget.style.borderColor=L.aB;e.currentTarget.style.color=L.accent;}}
-          onMouseLeave={e=>{e.currentTarget.style.borderColor=L.border;e.currentTarget.style.color=L.muted;}}>
-          + Agregar otra deuda
-        </button>
-      </div>}
-
-      {/* STEP 2: DASHBOARD */}
-      {step===2&&diag&&<div className="fade">
-        <div style={{marginBottom:20}}>
-          <h2 style={{fontSize:22, color:C.text, fontFamily:"'DM Serif Display',serif", marginBottom:4}}>
-            Tu plan Reset, {PRE.nombre.split(" ")[0]}
-          </h2>
-          <div style={{display:"flex", gap:8, alignItems:"center", flexWrap:"wrap"}}>
-            <span style={{fontSize:12, color:C.muted}}>Plan</span>
-            <Tag color={PLAN_COLOR[diag.planId]||C.accent}>{diag.plan.titulo}</Tag>
-            <span style={{fontSize:11, color:C.muted}}>· Reevaluacion en {diag.plan.reevaluacion}</span>
-          </div>
-        </div>
-        <div style={{marginBottom:20}}><Tabs tabs={TABS} active={activeTab} onChange={setActiveTab}/></div>
-        {activeTab==="plan"   &&<TabPlanReset   diag={diag} onGoToTab={setActiveTab}/>}
-        {activeTab==="deudas" &&<TabDeudas      deudas={deudas} onChange={setDeudas} diag={diag}/>}
-        {activeTab==="crono"  &&<TabCronograma  cronograma={diag.cronograma} deudas={deudas} flujoLibre={diag.flujoLibre}/>}
-        {activeTab==="sim"    &&<TabSimulador   diag={diag} ingreso={ingreso}/>}
-        {activeTab==="perfil" &&<TabPerfil      factores={diag.perfilFactores}/>}
-        {activeTab==="dim"    &&<TabDimensiones dimensiones={diag.dimensiones}/>}
-        {activeTab==="ia"     &&<TabIA diag={diag} iaResult={iaResult} iaLoading={iaLoading} iaError={iaError} onGenerar={generarIA}/>}
-      </div>}
-
-      {/* NAVEGACION — light en formularios */}
-      {step<2&&<div style={{display:"flex", justifyContent:"space-between", marginTop:24, alignItems:"center"}}>
-        {step>0
-          ?<button onClick={()=>setStep(s=>s-1)} style={{background:L.white, border:"1.5px solid "+L.border, borderRadius:10, padding:"11px 22px", color:L.muted, fontSize:13, cursor:"pointer", fontFamily:"'Syne',sans-serif", fontWeight:700, transition:"all 0.2s", boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor=L.border2;e.currentTarget.style.color=L.text;}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor=L.border;e.currentTarget.style.color=L.muted;}}>Atras</button>
-          :<div/>}
-        <button onClick={next} style={{background:L.accent, border:"none", borderRadius:10, padding:"12px 28px", fontSize:14, fontWeight:800, color:"#fff", cursor:"pointer", fontFamily:"'Syne',sans-serif", boxShadow:"0 4px 20px "+L.accent+"40", transition:"all 0.2s"}}
-          onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 28px "+L.accent+"55";}}
-          onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 4px 20px "+L.accent+"40";}}>
-          {step===1?"Ver mi plan Reset":"Continuar"}
-        </button>
-      </div>}
-    </div>
-
-    {/* STICKY BAR */}
-    {step===2&&<div style={{position:"fixed", bottom:0, left:0, right:0, background:C.surface+"F5", borderTop:"1px solid "+C.border, padding:"12px 24px", backdropFilter:"blur(12px)", zIndex:9}}>
-      <div style={{maxWidth:760, margin:"0 auto", display:"flex", alignItems:"center", justifyContent:"space-between", gap:16}}>
-        <div>
-          <div style={{fontSize:11, color:C.muted}}>Proximo paso</div>
-          <div style={{fontSize:13, fontWeight:700, color:C.text, fontFamily:"'Syne',sans-serif", marginTop:1}}>{diag?.plan?.cta||"Revisa tu plan de accion"}</div>
-        </div>
-        <button onClick={()=>setActiveTab("ia")} style={{background:"linear-gradient(135deg,"+nivelCfg.color+","+nivelCfg.color+"CC)", border:"none", borderRadius:10, padding:"10px 20px", fontSize:13, fontWeight:800, color:"#0A0C11", cursor:"pointer", fontFamily:"'Syne',sans-serif", flexShrink:0, transition:"all 0.2s"}}
-          onMouseEnter={e=>e.currentTarget.style.transform="translateY(-1px)"}
-          onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}>
-          {iaLoading?"Generando IA...":"Analisis IA"}
-        </button>
-      </div>
-    </div>}
-  </div>;
-}
-
-ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
-</script>
-</body>
-</html>

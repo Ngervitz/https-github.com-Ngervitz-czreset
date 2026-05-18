@@ -527,29 +527,29 @@ function calcularDimensiones(resp, fin, ingreso) {
 // =============================================================================
 const PLANES = {
   1:{id:1,titulo:"Orden Financiero",icon:"🗂️",color:"#4B8EF0",
-    problema:"Desorden financiero — no hay claridad sobre ingresos, gastos ni deudas.",
-    objetivo:"Crear claridad total sobre tu situación financiera antes de tomar nuevas decisiones.",
-    prioridades:["Armar un mapa mensual completo de ingresos, gastos y deudas.","Separar gastos esenciales de gastos ajustables.","Definir tu flujo libre real con los datos del Reset."],
+    problema:"No tenés claro cuánto ganás, cuánto gastás ni cuánto debés. Sin eso, cualquier plan es a ciegas.",
+    objetivo:"Entender exactamente cuánto entra, cuánto sale y cuánto debés. Con eso claro, todo lo demás es más fácil.",
+    prioridades:["Anotar todo lo que entra y todo lo que sale este mes. Sin excepción.","Separar lo que no podés dejar de pagar de lo que podés reducir.","Calcular cuánta plata te queda libre cada mes después de pagar todo."],
     cta:"Completar mapa de deudas y gastos",reevaluacion:"30 días"},
   2:{id:2,titulo:"Reducción de Deuda",icon:"📉",color:"#ff7538",
-    problema:"Sobrecarga financiera — los pagos mensuales superan la capacidad real.",
-    objetivo:"Reducir la presión mensual y priorizar las deudas que más afectan el perfil.",
-    prioridades:["Identificar la deuda prioritaria por mora, monto y cuota.","Evitar nuevas obligaciones financieras por al menos 30 días.","Negociar, refinanciar o cancelar las deudas de mayor impacto primero."],
+    problema:"Estás pagando demasiado en relación a lo que ganás. Cada mes es un esfuerzo y no alcanzás a salir.",
+    objetivo:"Bajar lo que pagás por mes y atacar primero las deudas que más te están frenando.",
+    prioridades:["Atacar primero la deuda que más daño te está haciendo — la que está en mora o la más cara.","No sacar ninguna deuda nueva por al menos 30 días. Cero tarjetas, cero cuotas.","Llamar al banco o financiera para negociar. Muchas veces aceptan planes que no publicitan."],
     cta:"Ver deuda prioritaria",reevaluacion:"60 a 90 días"},
   3:{id:3,titulo:"Recuperación Rápida",icon:"🚀",color:"#5cff70",
-    problema:"Ajustes menores — el perfil es bueno pero hay puntos concretos a corregir.",
-    objetivo:"Corregir puntos específicos para mejorar las chances de aprobación en poco tiempo.",
-    prioridades:["Mantener todos los pagos al día sin excepciones.","Reducir el ratio deuda/ingreso por debajo del 30%.","Reevaluar el perfil en una ventana corta (30-60 días)."],
+    problema:"Tu situación está bien encaminada. Hay algunos detalles que corregir para que el banco te diga que sí.",
+    objetivo:"Hacer los ajustes puntuales que faltan para que el banco te apruebe en la próxima solicitud.",
+    prioridades:["Pagar todo en fecha. Un solo atraso puede echarte atrás meses de progreso.","Bajar lo que pagás en deudas para que sea menos del 30% de lo que ganás.","En 30-60 días volver a evaluar el perfil para ver si ya podés aplicar."],
     cta:"Activar plan 30-60 días",reevaluacion:"30 a 60 días"},
   4:{id:4,titulo:"Estabilización / Riesgo Crítico",icon:"🚨",color:"#ff7538",
-    problema:"Inestabilidad severa — el deterioro financiero debe frenarse antes de cualquier otro paso.",
-    objetivo:"Frenar el deterioro financiero antes de pensar en nuevo crédito.",
-    prioridades:["No tomar nuevas deudas bajo ningún concepto.","Ordenar deudas informales, moras y gastos esenciales.","Recuperar estabilidad mínima del flujo mensual."],
+    problema:"Tu situación está en un punto crítico. Antes de pensar en un crédito nuevo, hay que estabilizar lo que tenés.",
+    objetivo:"Parar la caída primero. Estabilizarte. Después, con la situación ordenada, pensar en el crédito.",
+    prioridades:["No agarrar ninguna deuda nueva. Aunque sea tentador, ahora no es el momento.","Ordenar las deudas informales y las que están en mora. Son las que más daño hacen.","Lograr que cada mes te sobre aunque sea un poco. Eso es la base de todo."],
     cta:"Empezar primeros auxilios financieros",reevaluacion:"90 a 120 días"},
   5:{id:5,titulo:"Reperfilamiento",icon:"🔄",color:"#9B72F0",
-    problema:"Perfil deteriorado pero recuperable — hay voluntad pero el historial está dañado.",
-    objetivo:"Reconstruir el perfil con hábitos sostenidos, menor presión de deuda y seguimiento.",
-    prioridades:["Sostener hábitos financieros positivos durante 60-90 días.","Regularizar o negociar atrasos reportados.","Medir avance antes de volver a solicitar crédito."],
+    problema:"Tu historial financiero está dañado, pero tu actitud muestra que querés salir. Eso es recuperable.",
+    objetivo:"Reconstruir tu historial paso a paso. Con constancia y las deudas correctas, es posible.",
+    prioridades:["Hacer lo mismo bien durante 60-90 días seguidos. La constancia es lo que reconstruye el historial.","Regularizar o negociar los atrasos que figuran reportados. Eso limpia el perfil.","En 90 días, volver a medir el avance antes de pedir el crédito."],
     cta:"Iniciar seguimiento 90 días",reevaluacion:"90 días"},
 };
 
@@ -581,10 +581,10 @@ function calcularMotor(ingreso, gastos, deudas) {
   const prioritaria = sortedDeudas[0]||null;
   const mora = deudas.filter(d=>d.status==="en_mora"||d.status==="atraso_grave");
   const alertas=[];
-  if(fin.flujoLibre<0) alertas.push("Flujo mensual negativo — emergencia financiera.");
-  if(mora.length>0) alertas.push(mora.length+" deuda(s) en mora — riesgo de inhibición de fondos.");
-  if(fin.ratio>0.5) alertas.push("Ratio deuda/ingreso crítico — no calificarás para nuevos créditos.");
-  if(fin.cantInf>0) alertas.push("Préstamos informales activos — costos ocultos elevados.");
+  if(fin.flujoLibre<0) alertas.push("Cada mes gastás más de lo que entra. Eso es urgente.");
+  if(mora.length>0) alertas.push(mora.length+" deuda"+(mora.length>1?"s":"")+" sin pagar. Eso es lo primero que mira el banco.");
+  if(fin.ratio>0.5) alertas.push("Más de la mitad de tu sueldo ya está comprometido en deudas.");
+  if(fin.cantInf>0) alertas.push("Tenés préstamos informales (familia, amigos, prestamistas). Suelen salir más caros de lo que parecen.");
   const perfil = calcularPerfil(fin.ratio, mora, scoreReset, fin.flujoLibre, ingreso, deudas);
   const cronograma = generarCronograma(deudas, fin.flujoLibre>0?fin.flujoLibre:0, 0);
   return {scoreReset, nivelR, planId, plan, enc, fin, dim, mora, prioritaria, alertas, perfil, cronograma,
@@ -618,19 +618,19 @@ function calcularPerfil(ratio, mora, score, flujoLibre, ingreso, deudas) {
   return [
     {nombre:"Capacidad de pago",estado:ratio<0.3?"bien":ratio<0.5?"regular":"mal",
       desc:ratio<0.3?`Ratio ${fmt_pct(ratio)}, dentro del rango aceptable (<30%).`:`Ratio ${fmt_pct(ratio)}. Los bancos exigen menos del 30%.`,
-      accion:ratio>=0.3?`Objetivo: bajar a menos del 30% (${fmt(ingreso*.3)}/mes en deuda).`:null},
+      accion:ratio>=0.3?`Meta: que tus deudas no sean más del 30% de tu sueldo (${fmt(ingreso*.3)}/mes en cuotas).`:null},
     {nombre:"Historial de pagos",estado:mora.length===0?"bien":mora.length<=1?"regular":"mal",
       desc:mora.length===0?"Sin deudas en mora. Factor más valorado por los burós.":`${mora.length} deuda(s) en mora. Cada una impacta tu historial por hasta 5 años.`,
-      accion:mora.length>0?"Regularizá las deudas en mora antes de cualquier solicitud nueva.":null},
+      accion:mora.length>0?"Arreglá esas deudas antes de pedir cualquier crédito nuevo.":null},
     {nombre:"Flujo disponible",estado:flujoLibre>ingreso*.15?"bien":flujoLibre>0?"regular":"mal",
       desc:flujoLibre>0?`${fmt(flujoLibre)}/mes disponible. Los bancos exigen al menos 20-25% de margen.`:"Flujo negativo. No hay margen para ninguna cuota adicional.",
-      accion:flujoLibre<=ingreso*.15?`Necesitás al menos ${fmt(ingreso*.2)} de flujo libre mensual para calificar.`:null},
+      accion:flujoLibre<=ingreso*.15?`Necesitás que te sobre al menos ${fmt(ingreso*.2)} por mes después de pagar todo.`:null},
     {nombre:"Cantidad de deudas",estado:deudas.length<=2?"bien":deudas.length<=4?"regular":"mal",
       desc:deudas.length<=2?"Pocas deudas activas. Perfil limpio.":`${deudas.length} deudas activas. Señal de alerta para analistas de riesgo.`,
-      accion:deudas.length>2?"Cancelá al menos 1-2 deudas antes de solicitar un nuevo crédito.":null},
+      accion:deudas.length>2?"Intentá cancelar al menos 1 o 2 deudas antes de pedir algo nuevo.":null},
     {nombre:"¿Cuándo podrías calificar?",estado:meses<=3?"bien":meses<=9?"regular":"mal",
-      desc:meses===0?"Con correcciones menores, podrías calificar en menos de 1 mes.":`Siguiendo el plan, estimamos que podrías calificar en aproximadamente ${meses} meses.`,
-      accion:`Objetivo: mes ${meses} — ratio <30%, sin moras, flujo libre >20%.`,highlight:true},
+      desc:meses===0?"Con algunos ajustes pequeños, podrías calificar en menos de 1 mes.":meses===1?"Siguiendo el plan, podrías calificar en aproximadamente 1 mes.":`Siguiendo el plan, estimamos que en ${meses} meses estarías en condiciones de pedir el crédito.`,
+      accion:`Meta: en el mes ${meses} tener las deudas al día, sin mora, y que te sobre plata cada mes.`,highlight:true},
   ];
 }
 
@@ -640,7 +640,9 @@ function calcularPerfil(ratio, mora, score, flujoLibre, ingreso, deudas) {
 const fmt = n => "$"+Number(n||0).toLocaleString("es-UY",{maximumFractionDigits:0});
 const fmt_pct = n => Math.round((n||0)*100)+"%";
 function dias_desde(iso){ return Math.floor((Date.now()-new Date(iso).getTime())/86400000); }
-function get_api_key(){ try{return localStorage.getItem("cr_api_key")||"";}catch(e){return "";} }
+// API key configurada por el equipo de Credizona
+const ANTHROPIC_API_KEY = "sk-ant-REEMPLAZAR"; // TODO: poner la clave real
+function get_api_key(){ return ANTHROPIC_API_KEY; }
 
 function nivelColor(n){ return n==="A"||n==="MANEJABLE"?"#5cff70":n==="B"||n==="EN RIESGO"?"#ffd447":n==="B+"?"#9B72F0":"#ff7538"; }
 function nivelClass(n){ return n==="A"||n==="MANEJABLE"?"nc-M":n==="B"||n==="EN RIESGO"?"nc-R":"nc-K"; }
@@ -807,7 +809,7 @@ function updateSticky() {
   const txt = document.getElementById("sticky-step-txt");
   if(step===0){ txt.textContent="Completá tus gastos para continuar"; cta.textContent="Continuar"; cta.onclick=next; bar.style.display=""; }
   else if(step===1){ txt.textContent="Cargá tus deudas y generá tu plan"; cta.textContent="Ver mi plan Reset"; cta.onclick=next; bar.style.display=""; }
-  else if(step===2){ txt.textContent=diag?.plan?.cta||"Revisá tu plan de acción"; cta.textContent="Análisis IA"; cta.onclick=()=>switchTab("ia"); bar.style.display=""; }
+  else if(step===2){ txt.textContent=diag?.plan?.cta||"Revisá tu plan de acción"; cta.textContent="Ver análisis IA →"; cta.onclick=()=>switchTab("ia"); bar.style.display=""; }
 }
 
 // =============================================================================
@@ -886,7 +888,6 @@ function renderStep0() {
       <span class="total-val" id="total-val" style="color:${total>PRE.ingresoMensual*.9?'#ff7538':total>PRE.ingresoMensual*.7?'#ffd447':'#5cff70'}">${fmt(total)}</span>
     </div>
 
-    ${renderNavButtons(0)}
   </div>`;
 }
 
@@ -916,7 +917,6 @@ function renderStep1() {
       onmouseout="this.style.borderColor='rgba(255,255,255,.12)';this.style.color='#7a8aaa';">
       + Agregar otra deuda
     </button>
-    ${renderNavButtons(1)}
   </div>`;
 }
 
@@ -984,11 +984,11 @@ function renderNavButtons(cur) {
 function renderDashboard() {
   const TABS = [
     {id:"plan",l:"Tu Plan",i:"🎯"},
+    {id:"gastos",l:"Mis gastos",i:"💰"},
     {id:"deudas",l:"Mis deudas",i:"✏️"},
     {id:"crono",l:"Cronograma",i:"📅"},
     {id:"sim",l:"Simulador",i:"⚡"},
     {id:"perfil",l:"Perfil crediticio",i:"🏦"},
-    {id:"dim",l:"Dimensiones",i:"📐"},
     {id:"ia",l:"Análisis IA",i:"🤖"},
   ];
   return `
@@ -1010,13 +1010,14 @@ function renderTab() {
   const el = document.getElementById("tab-content");
   if(!el) return;
   if(activeTab==="plan")   el.innerHTML = renderTabPlan();
+  if(activeTab==="gastos") el.innerHTML = renderTabGastos();
   if(activeTab==="deudas") el.innerHTML = renderTabDeudas();
   if(activeTab==="crono")  el.innerHTML = renderTabCrono();
   if(activeTab==="sim")    el.innerHTML = renderTabSim();
   if(activeTab==="perfil") el.innerHTML = renderTabPerfil();
-  if(activeTab==="dim")    el.innerHTML = renderTabDim();
   if(activeTab==="ia")     el.innerHTML = renderTabIA();
   // Bind events after render
+  if(activeTab==="gastos") bindGastosTab();
   if(activeTab==="deudas") bindDeudasTab();
   if(activeTab==="crono")  bindCronoTab();
   if(activeTab==="sim")    bindSimTab();
@@ -1058,16 +1059,39 @@ function renderTabPlan() {
       </div>
     </div>
 
-    <!-- Scores -->
-    <div class="metrics-grid" style="margin-bottom:14px;">
-      <div class="card metric-card"><div class="metric-lbl">Score Reset</div><div class="metric-val" style="color:${pc};">${d.scoreReset}/100</div><div class="metric-sub">Nivel ${d.nivelR}</div></div>
-      <div class="card metric-card"><div class="metric-lbl">Score conductual</div><div class="metric-val" style="color:${nivelColor(d.enc.nivel)};">${d.enc.score}/100</div><div class="metric-sub">Nivel ${d.enc.nivel}</div></div>
-      <div class="card metric-card"><div class="metric-lbl">Reevaluación</div><div class="metric-val" style="color:#5cff70;font-size:13px;margin-top:4px;">${plan.reevaluacion}</div></div>
+    <!-- Scores — lenguaje simple -->
+    <div style="margin-bottom:14px;">
+      <div class="lbl" style="margin-bottom:10px;">TU PUNTAJE</div>
+      <div style="background:linear-gradient(180deg,rgba(11,22,48,.96),rgba(8,18,40,.98));border:2px solid ${pc}40;border-radius:16px;padding:20px;">
+        <!-- Puntaje total grande -->
+        <div style="text-align:center;margin-bottom:18px;">
+          <div style="font-size:11px;color:#a9b4cc;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Puntaje total</div>
+          <div style="font-size:52px;font-weight:900;color:${pc};font-family:'DM Serif Display',serif;line-height:1;">${d.scoreReset}</div>
+          <div style="font-size:12px;color:#a9b4cc;margin-top:2px;">sobre 100</div>
+          <div style="display:inline-block;margin-top:10px;background:${pc}20;border:1.5px solid ${pc}50;border-radius:20px;padding:5px 18px;font-size:12px;font-weight:900;color:${pc};text-transform:uppercase;letter-spacing:.06em;">${d.nivelR==="A"?"MUY BIEN":d.nivelR==="B"?"EN PROCESO":"REQUIERE ATENCIÓN"}</div>
+        </div>
+        <!-- Dos componentes -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;border-top:1px solid rgba(255,255,255,.07);padding-top:14px;">
+          <div style="text-align:center;">
+            <div style="font-size:10px;color:#a9b4cc;margin-bottom:4px;">Situación financiera</div>
+            <div style="font-size:24px;font-weight:700;color:${nivelColor(d.enc.nivel)};font-family:'DM Serif Display',serif;">${d.fin.scoreFinanciero}</div>
+            <div style="font-size:10px;color:#7a8aaa;margin-top:2px;">basado en tus gastos y deudas</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:10px;color:#a9b4cc;margin-bottom:4px;">Hábitos financieros</div>
+            <div style="font-size:24px;font-weight:700;color:${nivelColor(d.enc.nivel)};font-family:'DM Serif Display',serif;">${d.enc.score}</div>
+            <div style="font-size:10px;color:#7a8aaa;margin-top:2px;">basado en tu encuesta</div>
+          </div>
+        </div>
+        <div style="text-align:center;margin-top:12px;font-size:11px;color:#7a8aaa;">
+          Revisión sugerida en <strong style="color:#5cff70;">${plan.reevaluacion}</strong>
+        </div>
+      </div>
     </div>
 
     <!-- Métricas financieras -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-      ${[[fmt(d.fin.flujoLibre),d.fin.flujoLibre<0?"#ff7538":"#5cff70","Flujo libre/mes",d.fin.flujoLibre<0?"déficit":"disponible"],[fmt(d.fin.totalDeuda),"#ffd447","Deuda total",`${d.mora.length+d.fin.cantDeudas-d.mora.length} deudas`],[fmt_pct(d.fin.ratio),d.fin.ratio>0.5?"#ff7538":d.fin.ratio>0.35?"#ffd447":"#5cff70","Ratio deuda/ing","mensual"],[fmt(d.fin.pagoMinimo),"#a9b4cc","Pagos mínimos","por mes"]].map(([v,c,l,s])=>`
+      ${[[fmt(d.fin.flujoLibre),d.fin.flujoLibre<0?"#ff7538":"#5cff70","Plata que te sobra por mes",d.fin.flujoLibre<0?"estás en rojo":"después de todo"],[fmt(d.fin.totalDeuda),"#ffd447","Total de deudas",`${d.fin.cantDeudas} deuda${d.fin.cantDeudas!==1?"s":""}`],[fmt_pct(d.fin.ratio),d.fin.ratio>0.5?"#ff7538":d.fin.ratio>0.35?"#ffd447":"#5cff70","De tu sueldo va a deudas","meta: menos del 30%"],[fmt(d.fin.pagoMinimo),"#a9b4cc","Pagás por mes en cuotas","suma de todos los mínimos"]].map(([v,c,l,s])=>`
       <div class="card" style="padding:13px 14px;"><div class="metric-lbl">${l}</div><div class="metric-val" style="color:${c};font-size:18px;">${v}</div><div class="metric-sub">${s}</div></div>`).join("")}
     </div>
 
@@ -1117,13 +1141,104 @@ function renderTabPlan() {
 }
 
 // =============================================================================
+// TAB: MIS GASTOS
+// =============================================================================
+function renderTabGastos() {
+  const totalGastos = Object.values(gastos).reduce((s,v)=>s+(parseFloat(v)||0),0);
+  const ingreso = PRE.ingresoMensual;
+  const pct = ingreso>0 ? totalGastos/ingreso : 0;
+  const color = pct>0.9?"#ff7538":pct>0.7?"#ffd447":"#5cff70";
+
+  return `<div class="fade">
+    <p style="font-size:13px;color:#a9b4cc;margin-bottom:16px;line-height:1.65;">
+      Actualizá tus gastos fijos si algo cambió. El plan y el puntaje se recalculan solos.
+    </p>
+
+    <!-- Resumen -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
+      <div class="card metric-card">
+        <div class="metric-lbl">Total gastos por mes</div>
+        <div class="metric-val" style="color:${color};">${fmt(totalGastos)}</div>
+        <div class="metric-sub">${Math.round(pct*100)}% de tu sueldo</div>
+      </div>
+      <div class="card metric-card">
+        <div class="metric-lbl">Sueldo mensual</div>
+        <div class="metric-val" style="color:#a9b4cc;">${fmt(ingreso)}</div>
+        <div class="metric-sub">pre-cargado de la solicitud</div>
+      </div>
+    </div>
+
+    <!-- Barra visual -->
+    <div style="margin-bottom:20px;">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#a9b4cc;margin-bottom:6px;">
+        <span>Gastos vs sueldo</span>
+        <span style="color:${color};font-weight:700;">${Math.round(pct*100)}%</span>
+      </div>
+      <div class="progress-wrap" style="height:10px;">
+        <div class="progress-bar" style="width:${Math.min(pct*100,100)}%;background:${color};height:10px;"></div>
+      </div>
+      <div style="font-size:11px;color:#7a8aaa;margin-top:5px;">
+        ${pct>0.9?"⚠️ Tus gastos son muy altos en relación a lo que ganás":pct>0.7?"Tus gastos son altos — hay margen para reducir":"Tus gastos están bien controlados"}
+      </div>
+    </div>
+
+    <!-- Campos editables -->
+    <div class="card-strong" style="padding:20px 22px 6px;margin-bottom:14px;">
+      ${EXPENSE_CATS.map(c=>`
+        <div style="margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+            <span class="lbl" style="margin:0;">${c.l}</span>
+            ${parseFloat(gastos[c.k]||0)>0?`<span style="font-size:11px;color:#7a8aaa;">${Math.round((parseFloat(gastos[c.k])||0)/ingreso*100)}% del sueldo</span>`:""}
+          </div>
+          <div class="inp-prefix">
+            <span class="pfx">$</span>
+            <input class="inp gastos-inp" type="number" placeholder="0"
+              data-key="${c.k}" value="${gastos[c.k]||""}"
+              oninput="editarGasto('${c.k}',this.value)"
+              onchange="editarGasto('${c.k}',this.value)"/>
+          </div>
+        </div>`).join("")}
+    </div>
+
+    <p style="font-size:11px;color:#a9b4cc;text-align:center;">Los cambios se guardan automáticamente.</p>
+  </div>`;
+}
+
+function editarGasto(k, v) {
+  gastos[k] = v;
+  diag = calcularMotor(PRE.ingresoMensual, gastos, deudas);
+  guardar();
+  trackEvent("reset_profile_updated", {score:diag.scoreReset, plan:diag.planId});
+  // Re-render just the summary without losing focus
+  actualizarGastosResumen();
+}
+
+function actualizarGastosResumen() {
+  // Update the two stat cards and bar without full re-render
+  const totalGastos = Object.values(gastos).reduce((s,v)=>s+(parseFloat(v)||0),0);
+  const ingreso = PRE.ingresoMensual;
+  const pct = ingreso>0 ? totalGastos/ingreso : 0;
+  const color = pct>0.9?"#ff7538":pct>0.7?"#ffd447":"#5cff70";
+  const totalEl = document.querySelector(".metric-val[data-gastos-total]");
+  // Simple: just update the progress bar width and color
+  const bar = document.querySelector(".progress-bar[data-gastos-bar]");
+  if(bar){ bar.style.width=Math.min(pct*100,100)+"%"; bar.style.background=color; }
+}
+
+function bindGastosTab() {
+  // Add data attributes for live update
+  const bar = document.querySelector(".progress-bar");
+  if(bar) bar.setAttribute("data-gastos-bar","1");
+}
+
+// =============================================================================
 // TAB: MIS DEUDAS
 // =============================================================================
 function renderTabDeudas() {
   const total = deudas.reduce((s,d)=>s+(parseFloat(d.balance)||0),0);
   const canceladas = deudas.filter(d=>parseFloat(d.balance)===0||d.cancelada).length;
   return `<div class="fade">
-    <p style="font-size:13px;color:#a9b4cc;margin-bottom:16px;line-height:1.65;">Actualizá tus saldos a medida que vas pagando. El score y el cronograma se recalculan automáticamente.</p>
+    <p style="font-size:13px;color:#a9b4cc;margin-bottom:16px;line-height:1.65;">A medida que vas pagando tus deudas, actualizá los saldos acá. El plan y el puntaje se actualizan solos.</p>
     <div class="deudas-stats">
       <div class="card metric-card"><div class="metric-lbl">Deuda total</div><div class="metric-val" style="color:#ff7538;">${fmt(total)}</div></div>
       <div class="card metric-card"><div class="metric-lbl">Canceladas</div><div class="metric-val" style="color:#5cff70;">${canceladas}/${deudas.length}</div></div>
@@ -1189,21 +1304,21 @@ function renderTabCrono() {
   if(!crono.length) return `<div class="fade"><p style="font-size:13px;color:#a9b4cc;">Con flujo libre negativo no es posible proyectar. Primero reducí tus gastos.</p></div>`;
   const bars = crono.filter((_,i)=>i%Math.max(1,Math.floor(crono.length/24))===0||i===crono.length-1);
   return `<div class="fade">
-    <p style="font-size:13px;color:#a9b4cc;margin-bottom:16px;line-height:1.65;">Proyección mes a mes con método avalancha. Cada deuda cancelada libera su cuota para la siguiente.</p>
+    <p style="font-size:13px;color:#a9b4cc;margin-bottom:16px;line-height:1.65;">Esto muestra cuánto tiempo te lleva salir de tus deudas si seguís el plan. Cada vez que cancelás una deuda, esa plata se destina automáticamente a la siguiente.</p>
     <div class="card crono-extra">
-      <span class="crono-extra-lbl">¿Podés sumar un extra mensual?</span>
+      <span class="crono-extra-lbl">¿Podés pagar algo extra por mes además del mínimo?</span>
       <div style="display:flex;align-items:center;gap:6px;">
         <span style="color:#5cff70;font-weight:700;font-size:13px;">$</span>
         <input class="crono-extra-inp" type="number" id="crono-extra-inp" value="${cronoExtra}" placeholder="0"/>
       </div>
-      <span class="crono-result">→ ${crono.length>=60?"+60 meses":crono.length+" meses"} para cancelar todo</span>
+      <span class="crono-result">→ ${crono.length>=60?"más de 5 años":crono.length===1?"1 mes":crono.length<12?crono.length+" meses":Math.floor(crono.length/12)+" año"+(Math.floor(crono.length/12)>1?"s":"")+(crono.length%12>0?" y "+(crono.length%12)+" meses":"")+" para cancelar todo"}</span>
     </div>
     <div style="margin-bottom:6px;font-size:10px;color:#a9b4cc;text-transform:uppercase;letter-spacing:.06em;">Evolución de deuda total</div>
     <div class="crono-bar-wrap">
       ${bars.map(m=>{const pct=totalIni>0?m.totalSaldo/totalIni:0;const c=pct>0.6?"#ff7538":pct>0.3?"#ffd447":"#5cff70";return`<div class="crono-bar" style="height:${Math.max(2,pct*68)}px;background:${c};"></div>`}).join("")}
     </div>
-    <div style="display:flex;justify-content:space-between;font-size:11px;color:#a9b4cc;margin-bottom:16px;"><span>${fmt(totalIni)}</span><span style="color:#5cff70;">$0</span></div>
-    <div style="font-size:10px;color:#a9b4cc;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Hitos del plan</div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:#a9b4cc;margin-bottom:4px;"><span>Deuda hoy: ${fmt(totalIni)}</span><span style="color:#5cff70;">Meta: $0</span></div>
+    <div style="font-size:10px;color:#a9b4cc;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">¿Cuánto te queda en cada momento?</div>
     ${[1,3,6,12,24,36].filter(m=>m<=crono.length).map(mesN=>{
       const snap=crono[mesN-1]; if(!snap)return"";
       const pct=totalIni>0?((totalIni-snap.totalSaldo)/totalIni*100):100;
@@ -1224,41 +1339,100 @@ function bindCronoTab(){
 }
 
 // =============================================================================
-// TAB: SIMULADOR
+// TAB: SIMULADOR — lenguaje simple para persona común
 // =============================================================================
 function renderTabSim() {
   const ingreso = PRE.ingresoMensual;
   const d = diag;
-  const nf = d.fin.flujoLibre - (simState.g||0) + (simState.i||0) - (simState.p||0);
-  const nr = ingreso>0?(d.fin.pagoMinimo+(simState.p||0))/ingreso:0;
+  const gastoR = simState.g||0;
+  const pagoR  = simState.p||0;
+  const ingR   = simState.i||0;
+  const nuevoFlujo = d.fin.flujoLibre - gastoR + ingR - pagoR;
+  const nuevoPago  = d.fin.pagoMinimo + pagoR;
+  const nuevoRatio = ingreso>0 ? nuevoPago/ingreso : 0;
   let ns=100;
-  if(nr>0.5)ns-=38; else if(nr>0.35)ns-=24; else if(nr>0.2)ns-=10;
-  if(nf<0)ns-=32; else if(nf<ingreso*.1)ns-=14;
+  if(nuevoRatio>0.5)ns-=38; else if(nuevoRatio>0.35)ns-=24; else if(nuevoRatio>0.2)ns-=10;
+  if(nuevoFlujo<0)ns-=32; else if(nuevoFlujo<ingreso*.1)ns-=14;
   if(d.mora.length>0)ns-=20;
   ns=clamp(Math.round(ns),0,100);
   const delta=ns-d.scoreReset;
-  const scenarios=[{l:"Libero $5k",g:5000,p:0,i:0},{l:"Pago extra $10k",g:0,p:10000,i:0},{l:"Ingreso +10%",g:0,p:0,i:Math.round(ingreso*.1)},{l:"Todo junto",g:5000,p:10000,i:Math.round(ingreso*.05)}];
+  const mejora = nuevoFlujo - d.fin.flujoLibre;
+
+  const scenarios=[
+    {l:"Bajo $5.000 en gastos",g:5000,p:0,i:0},
+    {l:"Pago $10.000 extra a deudas",g:0,p:10000,i:0},
+    {l:"Gano 10% más",g:0,p:0,i:Math.round(ingreso*.1)},
+    {l:"Hago todo junto",g:5000,p:10000,i:Math.round(ingreso*.05)}
+  ];
+
   return `<div class="fade">
-    <p style="font-size:13px;color:#a9b4cc;margin-bottom:18px;line-height:1.65;">Modificá los valores para ver cómo cambia tu situación en tiempo real.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;">
-      ${scenarios.map(s=>`<button class="sim-scenario" onclick="aplicarScenario(${s.g},${s.p},${s.i})">${s.l}</button>`).join("")}
+    <p style="font-size:13px;color:#a9b4cc;margin-bottom:8px;line-height:1.65;">¿Qué pasa si cambiás algo en tu situación? Mové los controles y mirá el resultado.</p>
+    <p style="font-size:12px;color:#7a8aaa;margin-bottom:18px;">Los números cambian solos mientras arrastrás.</p>
+
+    <!-- Scenarios rápidos -->
+    <div style="margin-bottom:16px;">
+      <div class="lbl" style="margin-bottom:8px;">ESCENARIOS RÁPIDOS</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${scenarios.map(s=>`<button class="sim-scenario" onclick="aplicarScenario(${s.g},${s.p},${s.i})">${s.l}</button>`).join("")}
+      </div>
     </div>
-    <div class="card" style="padding:18px 18px 4px;margin-bottom:14px;">
-      ${[["Reducción de gastos mensuales","g","#5cff70"],["Pago extra mensual a deudas","p","#ffd447"],["Ingreso adicional mensual","i","#4B8EF0"]].map(([l,k,c])=>`
-      <div style="margin-bottom:18px;">
-        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-          <span style="font-size:11px;color:#a9b4cc;">${l}</span>
-          <span style="font-size:12px;color:${c};font-weight:700;">${fmt(simState[k]||0)}</span>
+
+    <!-- Sliders con lenguaje simple -->
+    <div class="card" style="padding:18px 18px 6px;margin-bottom:16px;">
+      ${[
+        {l:"Si bajo mis gastos en...",k:"g",c:"#5cff70",hint:"alquiler, comida, servicios"},
+        {l:"Si pago de más en mis deudas...",k:"p",c:"#ffd447",hint:"suma al mínimo que ya pagás"},
+        {l:"Si gano más dinero por mes...",k:"i",c:"#4B8EF0",hint:"changas, aumento, trabajo extra"}
+      ].map(({l,k,c,hint})=>`
+      <div style="margin-bottom:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+          <div>
+            <span style="font-size:13px;color:#f7fbff;font-weight:700;">${l}</span>
+            <div style="font-size:11px;color:#7a8aaa;margin-top:1px;">${hint}</div>
+          </div>
+          <span style="font-size:16px;color:${c};font-weight:900;font-family:'DM Serif Display',serif;">${fmt(simState[k]||0)}</span>
         </div>
-        <input type="range" min="0" max="${ingreso}" step="500" value="${simState[k]||0}" style="width:100%;accent-color:${c};" oninput="updateSim('${k}',this.value)"/>
+        <input type="range" min="0" max="${Math.round(ingreso*.6)}" step="500" value="${simState[k]||0}"
+          style="width:100%;accent-color:${c};" oninput="updateSim('${k}',this.value)"/>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#566070;margin-top:3px;">
+          <span>$0</span><span>${fmt(Math.round(ingreso*.6))}</span>
+        </div>
       </div>`).join("")}
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-      ${[["Nuevo flujo libre",fmt(nf),nf>d.fin.flujoLibre],[fmt_pct(d.fin.ratio)+" → "+fmt_pct(nr),"Nuevo ratio deuda",nr<d.fin.ratio],[`${d.scoreReset}/100 → ${ns}/100`,"Score estimado",delta>=0],[fmt(nf-d.fin.flujoLibre),"Mejora de flujo",nf>=d.fin.flujoLibre]].map(([v,l,b],ri)=>`
-      <div class="card sim-result">
-        <div class="sim-lbl">${l}</div>
-        <div class="sim-val" style="color:${b?"#5cff70":"#ff7538"};">${ri===1?v.split("→")[1].trim():ri===2?v.split("→")[1].trim():v}${ri===2&&delta!==0?`<span style="font-size:11px;color:${delta>0?"#5cff70":"#ff7538"};margin-left:6px;">${delta>0?"+":""}${delta}</span>`:""}</div>
-      </div>`).join("")}
+
+    <!-- Resultados en lenguaje simple -->
+    <div class="lbl" style="margin-bottom:10px;">LO QUE CAMBIARÍA</div>
+    <div style="display:grid;gap:10px;">
+
+      <div class="card" style="padding:16px 18px;border-left:3px solid ${nuevoFlujo>d.fin.flujoLibre?"#5cff70":"#ff7538"};">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#f7fbff;margin-bottom:3px;">Plata que te sobra cada mes</div>
+            <div style="font-size:12px;color:#a9b4cc;">${nuevoFlujo>0?"Después de pagar todo, te quedaría libre:":"Seguirías en rojo por:"}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:22px;font-weight:700;color:${nuevoFlujo>0?"#5cff70":"#ff7538"};font-family:'DM Serif Display',serif;">${fmt(Math.abs(nuevoFlujo))}</div>
+            ${mejora>0?`<div style="font-size:11px;color:#5cff70;">+${fmt(mejora)} más que ahora</div>`:`<div style="font-size:11px;color:#ff7538;">${fmt(mejora)} que ahora</div>`}
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:16px 18px;border-left:3px solid ${delta>0?"#5cff70":delta<0?"#ff7538":"#a9b4cc"};">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#f7fbff;margin-bottom:3px;">Tu puntaje estimado</div>
+            <div style="font-size:12px;color:#a9b4cc;">Cómo quedarías con estos cambios</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:22px;font-weight:700;color:${delta>0?"#5cff70":delta<0?"#ff7538":"#a9b4cc"};font-family:'DM Serif Display',serif;">${ns}<span style="font-size:13px;">/100</span></div>
+            ${delta!==0?`<div style="font-size:11px;color:${delta>0?"#5cff70":"#ff7538"};">${delta>0?"+":""}${delta} puntos</div>`:`<div style="font-size:11px;color:#a9b4cc;">sin cambios</div>`}
+          </div>
+        </div>
+      </div>
+
+      ${gastoR>0||pagoR>0||ingR>0?`<div style="background:rgba(92,255,112,.06);border:1px solid rgba(92,255,112,.2);border-radius:12px;padding:14px 16px;font-size:13px;color:#a9b4cc;line-height:1.65;">
+        💡 <strong style="color:#5cff70;">Conclusión:</strong> ${delta>5?"Con estos cambios tu situación mejora bastante. Vale la pena intentarlo.":delta>0?"Hay una pequeña mejora. Combiná varias acciones para un impacto mayor.":delta<0?"Estas acciones soñas no mejoran suficiente. Probá otras combinaciones.":"Tu situación se mantiene igual con estos cambios."}
+      </div>`:""}
     </div>
   </div>`;
 }
@@ -1271,11 +1445,50 @@ function bindSimTab(){}
 // TAB: PERFIL CREDITICIO
 // =============================================================================
 function renderTabPerfil() {
+  const PERFIL_SIMPLE = [
+    { nombre:"¿Podés pagar una cuota nueva?",
+      bueno:"Sí. Tus pagos mensuales actuales son razonables para tu ingreso.",
+      regular:"Más o menos. Estás pagando bastante en relación a lo que ganás.",
+      malo:"Por ahora no. La mayoría de tu sueldo ya está comprometido en deudas.",
+      accionMalo:"El banco ve que no te sobra dinero para pagar algo más. Hay que liberar plata antes de pedir crédito.",
+      key:"capacidad" },
+    { nombre:"¿Tenés deudas sin pagar?",
+      bueno:"No. Tus deudas están todas al día.",
+      regular:"Tenés algún atraso. Eso complica un poco tu perfil.",
+      malo:"Tenés deudas que no se están pagando. Eso es lo primero que mira el banco y lo que más te afecta.",
+      accionMalo:"Hay que arreglar esas deudas antes de intentar sacar un crédito nuevo.",
+      key:"mora" },
+    { nombre:"¿Te queda plata libre cada mes?",
+      bueno:"Sí. Después de pagar todo te queda un margen cómodo.",
+      regular:"Poco. Cubrís los gastos pero casi sin margen.",
+      malo:"No. Cada mes gastás más de lo que entra, o llegás exacto.",
+      accionMalo:"Sin plata libre, no podés pagar una cuota más. Hay que bajar gastos o aumentar ingresos.",
+      key:"flujo" },
+    { nombre:"¿Cuántas deudas tenés?",
+      bueno:"Pocas. Eso da buena imagen.",
+      regular:"Varias. No es un problema grave, pero llama la atención.",
+      malo:"Muchas. Los bancos ven eso como señal de que dependés mucho del crédito.",
+      accionMalo:"Antes de pedir algo nuevo, tratá de cancelar al menos una o dos.",
+      key:"cantidad" },
+    { nombre:"¿Cuándo podrías calificar para un crédito?",
+      highlight:true,
+      key:"cuando" }
+  ];
+
+  // Map diag.perfil to simple language
+  const items = diag.perfil.map((f,i)=>{
+    const simple = PERFIL_SIMPLE[i];
+    const c = estado_color(f.estado);
+    const desc = f.estado==="bien" ? simple.bueno : f.estado==="regular" ? simple.regular : simple.malo;
+    const accion = f.estado==="mal" && simple.accionMalo ? simple.accionMalo : f.accion;
+    return { ...f, desc, accion, simple };
+  });
+
   return `<div class="fade">
-    <p style="font-size:13px;color:#a9b4cc;margin-bottom:18px;line-height:1.65;">Por qué fuiste rechazado y qué necesitás mejorar para calificar.</p>
-    ${diag.perfil.map(f=>{
+    <p style="font-size:13px;color:#a9b4cc;margin-bottom:18px;line-height:1.65;">Esto es lo que mira el banco cuando recibe tu solicitud. Te explicamos cada punto en simple.</p>
+    ${items.map(f=>{
       const c=estado_color(f.estado);
-      return `<div class="perfil-row card ${f.highlight?"":""}${f.highlight?`" style="border:1.5px solid ${c}40;background:${c}08`:""}">
+      return `<div class="perfil-row card ${f.highlight?`" style="border:1.5px solid ${c}40;background:${c}08`:""}>
         <div class="perfil-header">
           <div class="perfil-badge-num" style="background:${c}20;border:1.5px solid ${c}60;color:${c};">${estado_icon(f.estado)}</div>
           <span class="perfil-nombre" style="${f.highlight?`color:${c}`:"color:#f7fbff"}">${f.nombre}</span>
@@ -1285,36 +1498,34 @@ function renderTabPerfil() {
         ${f.accion?`<div class="perfil-accion" style="background:${c}10;border:1px solid ${c}30;color:${c};">→ ${f.accion}</div>`:""}
       </div>`;
     }).join("")}
-  </div>`;
-}
 
-// =============================================================================
-// TAB: DIMENSIONES
-// =============================================================================
-function renderTabDim() {
-  const dims=[
-    {k:"organizacion",l:"Organización",d:"Claridad sobre ingresos, gastos y deudas"},
-    {k:"resiliencia",l:"Resiliencia",d:"Capacidad ante gastos imprevistos"},
-    {k:"responsabilidad",l:"Responsabilidad",d:"Apertura a entender y cambiar la situación"},
-    {k:"accionReciente",l:"Acción reciente",d:"Acciones tomadas en los últimos meses"},
-    {k:"conductaAutocontrol",l:"Conducta / autocontrol",d:"Hábitos de manejo del dinero"},
-    {k:"estresFinanciero",l:"Estrés financiero",d:"Nivel de preocupación por la situación"},
-    {k:"presionDeuda",l:"Presión de deuda",d:"Carga de pagos sobre el ingreso mensual"},
-    {k:"liquidez",l:"Liquidez",d:"Margen libre disponible cada mes"},
-  ];
-  return `<div class="fade">
-    <p style="font-size:13px;color:#a9b4cc;margin-bottom:18px;line-height:1.65;">Estas dimensiones combinan el perfil conductual con los datos financieros. Se usan para personalizar el plan y el análisis de IA.</p>
-    ${dims.map(dim=>{
-      const val=diag.dim[dim.k]||0;
-      const c=val>=70?"#5cff70":val>=40?"#ffd447":"#ff7538";
-      return `<div class="card dim-row" style="margin-bottom:10px;">
-        <div class="dim-header">
-          <div><div class="dim-name">${dim.l}</div><div style="font-size:11px;color:#a9b4cc;">${dim.d}</div></div>
-          <div class="dim-val" style="color:${c};">${val}</div>
+    <!-- CLEARING BLOQUEADO -->
+    <div style="position:relative;margin-top:8px;">
+      <div class="card" style="padding:20px;border:2px dashed rgba(255,212,71,.3);background:rgba(255,212,71,.04);filter:blur(0);">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <div style="width:40px;height:40px;border-radius:10px;background:rgba(255,212,71,.15);border:1.5px solid rgba(255,212,71,.4);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🔒</div>
+          <div>
+            <div style="font-size:14px;font-weight:700;color:#f7fbff;font-family:'DM Serif Display',serif;">Informe Clearing de Informes</div>
+            <div style="font-size:12px;color:#a9b4cc;margin-top:2px;">Ver exactamente qué deudas tiene reportadas el banco sobre vos</div>
+          </div>
+          <div style="margin-left:auto;text-align:right;flex-shrink:0;">
+            <div style="font-size:10px;color:#a9b4cc;margin-bottom:2px;">Precio</div>
+            <div style="font-size:18px;font-weight:900;color:#ffd447;font-family:'DM Serif Display',serif;">UYU 990</div>
+          </div>
         </div>
-        <div class="progress-wrap"><div class="progress-bar" style="width:${val}%;background:${c};"></div></div>
-      </div>`;
-    }).join("")}
+        <div style="display:grid;gap:8px;margin-bottom:16px;">
+          ${["Ver todas tus deudas reportadas en el sistema financiero","Entender exactamente por qué te rechazaron","Descubrir si hay errores en tu historial que podés corregir","Saber qué deudas negociar primero para mejorar tu perfil"].map(b=>`
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <span style="color:#ffd447;font-weight:900;flex-shrink:0;">✓</span>
+            <span style="font-size:13px;color:#a9b4cc;">${b}</span>
+          </div>`).join("")}
+        </div>
+        <button onclick="alert('Próximamente — sistema de pago en proceso de integración.')" style="width:100%;background:linear-gradient(90deg,#ffd447,#f59e0b);border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:900;color:#1a1000;cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:.02em;">
+          Obtener mi informe Clearing →
+        </button>
+        <p style="font-size:11px;color:#7a8aaa;text-align:center;margin-top:8px;">Pago único · Sin suscripción · Resultado en 24 horas</p>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -1346,14 +1557,7 @@ function renderTabIA() {
       <div class="ia-features">
         ${["Diagnóstico personalizado","Por qué este plan","Primer paso concreto","Mensaje directo"].map(f=>`<span class="ia-feature">${f}</span>`).join("")}
       </div>
-      <div style="margin-bottom:12px;">
-        <span class="lbl">🔑 API KEY DE ANTHROPIC</span>
-        <div style="display:flex;gap:8px;">
-          <input class="inp" type="password" id="ia-api-key" placeholder="sk-ant-api03-..." value="${get_api_key()}" oninput="localStorage.setItem('cr_api_key',this.value)" style="flex:1;"/>
-          <button onclick="toggleApiKey()" class="btn-secondary" style="flex-shrink:0;padding:8px 12px;font-size:11px;" id="btn-toggle-key">Ver</button>
-        </div>
-        <p style="font-size:11px;color:#7a8aaa;margin-top:4px;">Tu clave se guarda solo en este navegador.</p>
-      </div>
+
       <button class="btn-primary" id="btn-generar-ia" style="width:100%;">Generar análisis IA →</button>
     </div>
   </div>`;
@@ -1389,11 +1593,6 @@ function bindIATab(){
   if(btnR) btnR.onclick = () => llamarClaude(diag);
 }
 
-function toggleApiKey(){
-  const inp = document.getElementById("ia-api-key");
-  const btn = document.getElementById("btn-toggle-key");
-  if(inp){ inp.type = inp.type==="password"?"text":"password"; if(btn) btn.textContent=inp.type==="password"?"Ver":"Ocultar"; }
-}
 
 // =============================================================================
 // START

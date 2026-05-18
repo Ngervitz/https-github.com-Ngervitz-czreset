@@ -49,8 +49,17 @@ textarea{resize:vertical;font-family:inherit;}
 </style>
 </head>
 <body>
+<div id="loading" style="position:fixed;inset:0;background:#050914;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:20px;">
+  <img src="https://www.credizona.com.uy/imagenes/LogoHeader.svg" alt="Credizona" style="height:32px;filter:brightness(0) invert(1);opacity:0.9;"/>
+  <div style="display:flex;gap:6px;margin-top:8px;">
+    <div style="width:8px;height:8px;border-radius:50%;background:#5cff70;animation:ldot .9s ease infinite;"></div>
+    <div style="width:8px;height:8px;border-radius:50%;background:#5cff70;animation:ldot .9s ease .15s infinite;"></div>
+    <div style="width:8px;height:8px;border-radius:50%;background:#5cff70;animation:ldot .9s ease .3s infinite;"></div>
+  </div>
+  <style>@keyframes ldot{0%,100%{opacity:.2;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}</style>
+</div>
 <div id="root"></div>
-<script type="text/babel">
+<script type="text/babel" data-presets="react" data-type="module">
 const { useState, useEffect, useRef } = React;
 
 // =============================================================================

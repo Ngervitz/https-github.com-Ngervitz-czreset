@@ -2,6 +2,9 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Credizona Reset</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
@@ -357,8 +360,6 @@ select.inp{cursor:pointer;}
 // ALGORITHM VERSION & EVENTS
 // =============================================================================
 const ALGORITHM_VERSION = "reset_v2_plan_engine";
-const RESET_API_URL   = "https://tu-backend.com/api/reset/guardar"; // TODO
-const RESET_API_TOKEN = "reset-token-interno"; // TODO
 
 function trackEvent(name, data) {
   console.log("[RESET EVENT]", name, data);
@@ -386,6 +387,47 @@ function getPreLoaded() {
   };
 }
 const PRE = getPreLoaded();
+
+// =============================================================================
+// DETECCIÓN DE SEGMENTO
+// Seg 1: rechazado con encuesta (tiene ingreso + P1-P10)
+// Seg 2: rechazado sin encuesta (tiene ingreso pero no encuesta)
+// Seg 3: público general (sin datos precargados)
+// =============================================================================
+const SEGMENTO = (() => {
+  const tieneIngreso  = !!new URLSearchParams(window.location.search).get("ingreso");
+  const tieneEncuesta = Object.values(PRE.respuestas).some(v=>v!==null);
+  if (tieneIngreso && tieneEncuesta) return 1;
+  if (tieneIngreso && !tieneEncuesta) return 2;
+  return 3;
+})();
+
+const SEGMENTO_CFG = {
+  1: {
+    kicker:      "Diagnóstico post-rechazo",
+    h1:          "Ya tenemos tu encuesta.",
+    h1green:     "Te mostramos una primera lectura.",
+    sub:         "Antes de cargar tus gastos y deudas, mirá lo que ya podemos decirte con los datos que tenemos.",
+    cta:         "Ver qué me está frenando →",
+    showPreview: true,
+  },
+  2: {
+    kicker:      "Diagnóstico post-rechazo",
+    h1:          "Te rechazaron el préstamo.",
+    h1green:     "Ahora entendé qué hacer.",
+    sub:         "Cargá tus gastos y deudas en 5 minutos y te decimos exactamente qué está frenando tu perfil y cómo mejorar.",
+    cta:         "Empezar diagnóstico →",
+    showPreview: false,
+  },
+  3: {
+    kicker:      "Diagnóstico financiero gratuito",
+    h1:          "Entendé tu situación financiera.",
+    h1green:     "Sabé qué hacer primero.",
+    sub:         "Cargá tus gastos y deudas en 5 minutos. Te decimos en qué estás, qué te frena y cuál es el primer paso.",
+    cta:         "Hacer mi diagnóstico gratis →",
+    showPreview: false,
+  },
+};
 
 const SITUACION_LABELS = {
   relacion_dependencia:"Relación de dependencia", monotributista:"Monotributista",
@@ -640,58 +682,226 @@ function calcularPerfil(ratio, mora, score, flujoLibre, ingreso, deudas) {
 const fmt = n => "$"+Number(n||0).toLocaleString("es-UY",{maximumFractionDigits:0});
 const fmt_pct = n => Math.round((n||0)*100)+"%";
 function dias_desde(iso){ return Math.floor((Date.now()-new Date(iso).getTime())/86400000); }
-// API key configurada por el equipo de Credizona
-const ANTHROPIC_API_KEY = "sk-ant-REEMPLAZAR"; // TODO: poner la clave real
+// =============================================================================
+// CONFIGURACIÓN BACKEND — IT debe completar estas variables
+// =============================================================================
+// TODO IT: Reemplazar con la URL real del endpoint del CRM
+const RESET_API_URL   = "https://api.credizona.com.uy/api/reset/guardar";
+// TODO IT: Reemplazar con el token de autenticación interno
+const RESET_API_TOKEN = "REEMPLAZAR_CON_TOKEN_REAL";
+// TODO IT: URL del endpoint de pago (MercadoPago, Stripe, etc.)
+const RESET_PAYMENT_URL = "https://api.credizona.com.uy/api/reset/payment";
+// TODO IT: URL del endpoint de solicitud de informe Clearing
+const RESET_CLEARING_URL = "https://api.credizona.com.uy/api/reset/clearing-request";
+// TODO IT: URL del endpoint de análisis IA (backend propio, no frontend)
+const RESET_AI_URL = "https://api.credizona.com.uy/api/reset/ai-analysis";
+
+// API key Anthropic — SOLO para demo/desarrollo
+// TODO IT: Mover a backend. Nunca exponer en producción.
+const ANTHROPIC_API_KEY = "sk-ant-REEMPLAZAR";
 function get_api_key(){ return ANTHROPIC_API_KEY; }
 
-function nivelColor(n){ return n==="A"||n==="MANEJABLE"?"#5cff70":n==="B"||n==="EN RIESGO"?"#ffd447":n==="B+"?"#9B72F0":"#ff7538"; }
-function nivelClass(n){ return n==="A"||n==="MANEJABLE"?"nc-M":n==="B"||n==="EN RIESGO"?"nc-R":"nc-K"; }
+// =============================================================================
+// CRM — PAYLOAD COMPLETO
+// Todos los datos del cliente, diagnóstico y plan se envían al CRM en un solo POST.
+// El CRM debe:
+//   1. Buscar el contacto por cédula o email (ya existe — viene del rechazo)
+//   2. Actualizar sus propiedades con los datos del Reset
+//   3. Guardar el snapshot completo en reset_sesiones
+//   4. Si plan_id===4 (crítico), crear tarea de seguimiento en CRM
+//   5. Calcular fecha_reevaluacion según plan (ver DIAS_REEVAL abajo)
+//   6. Si tiene seguimiento activo (ongoing===true), programar Clearing día 30/60/90
+// =============================================================================
+const DIAS_REEVAL = {1:30, 2:75, 3:45, 4:105, 5:90};
 
-function estado_color(e){ return e==="bien"?"#5cff70":e==="regular"?"#ffd447":"#ff7538"; }
-function estado_icon(e){ return e==="bien"?"✓":e==="regular"?"~":"✕"; }
-function estado_lbl(e){ return e==="bien"?"OK":e==="regular"?"MEJORABLE":"CRÍTICO"; }
+function buildCRMPayload(motor, tipoEvento, extraData={}) {
+  const diasPlan = DIAS_REEVAL[motor.planId] || 60;
+  const fechaReeval = new Date(Date.now() + diasPlan * 86400000).toISOString();
+  const diasRec = snapshot ? Math.floor((Date.now()-new Date(snapshot.fecha_inicio).getTime())/86400000) : 0;
 
-function deuda_color(s){ return s==="en_mora"||s==="atraso_grave"?"#ff7538":s==="atraso_leve"?"#ffd447":"#5cff70"; }
-function deuda_lbl(s){ return s==="en_mora"?"🚨 En mora":s==="atraso_grave"?"🔴 Atraso grave":s==="atraso_leve"?"🟡 Atraso leve":"✅ Al día"; }
+  return {
+    // Identificación del contacto
+    user: {
+      nombre:          PRE.nombre,
+      cedula:          PRE.cedula,
+      email:           PRE.email,
+      telefono:        PRE.telefono,
+      ingreso:         PRE.ingresoMensual,
+      laboral:         PRE.situacionLaboral,
+      monto_solicitado:PRE.montoSolicitado,
+      motivo_rechazo:  PRE.motivoRechazo,
+      canal:           PRE.canal,
+      segmento:        SEGMENTO, // 1=con encuesta, 2=sin encuesta, 3=general
+    },
+
+    // Datos de la encuesta conductual
+    encuesta: {
+      respuestas:       PRE.respuestas,
+      score_v2:         motor.enc.score,
+      nivel_final:      motor.enc.nivel,
+      nivel_base:       motor.enc.nivelBase,
+      b_plus:           motor.enc.bPlus,
+      flags_riesgo:     motor.enc.flagsRiesgo,
+      bloques:          motor.enc.bloques,
+    },
+
+    // Datos financieros declarados
+    financiero: {
+      gastos_detalle:       gastos,
+      deudas_detalle:       deudas.map(d=>({
+        tipo:d.type, entidad:d.bank||"",
+        saldo:parseFloat(d.balance)||0,
+        pago_mensual:parseFloat(d.minPayment)||0,
+        estado:d.status,
+      })),
+      total_gastos:         motor.fin.totalGastos,
+      total_deuda:          motor.fin.totalDeuda,
+      pago_minimo_total:    motor.fin.pagoMinimo,
+      flujo_libre:          motor.fin.flujoLibre,
+      ratio_deuda_ingreso:  motor.fin.ratio,
+      cantidad_deudas:      motor.fin.cantDeudas,
+      cantidad_moras:       motor.fin.cantMoras,
+      cantidad_informales:  motor.fin.cantInf,
+      score_financiero:     motor.fin.scoreFinanciero,
+    },
+
+    // Dimensiones conductuales
+    dimensiones: motor.dim,
+
+    // Resultado del motor Reset
+    reset: {
+      score_reset:          motor.scoreReset,
+      nivel_reset:          motor.nivelR,
+      plan_id:              motor.planId,
+      plan_titulo:          motor.plan.titulo,
+      problema_dominante:   motor.plan.problema,
+      objetivo:             motor.plan.objetivo,
+      prioridades:          motor.plan.prioridades,
+      cta:                  motor.plan.cta,
+      reevaluacion:         motor.plan.reevaluacion,
+      fecha_reevaluacion:   fechaReeval,
+      saldo_inicial:        saldoInicial,
+      dia_recuperacion:     diasRec,
+    },
+
+    // Deuda prioritaria
+    prioridad_deuda: motor.prioritaria ? {
+      tipo:        motor.prioritaria.type,
+      entidad:     motor.prioritaria.bank||"",
+      saldo:       parseFloat(motor.prioritaria.balance)||0,
+      pago_mensual:parseFloat(motor.prioritaria.minPayment)||0,
+      estado:      motor.prioritaria.status,
+    } : null,
+
+    // Resultado IA (si ya fue generado)
+    ia_resultado: iaResult||null,
+
+    // Recovery snapshot día 0
+    snapshot: snapshot||null,
+
+    // Metadata del sistema
+    metadata: {
+      evento:            tipoEvento,
+      algorithm_version: ALGORITHM_VERSION,
+      timestamp:         new Date().toISOString(),
+      segmento:          SEGMENTO,
+      ...extraData,
+    },
+  };
+}
+
+// Envío al CRM — no bloquea el flujo si falla
+async function guardarEnCRM(motor, tipoEvento, extraData={}) {
+  const payload = buildCRMPayload(motor, tipoEvento, extraData);
+  try {
+    const res = await fetch(RESET_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Reset-Token": RESET_API_TOKEN,
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if(!data.ok) console.warn("[CRM] Error:", data.error);
+    else console.log("[CRM] Guardado. ID:", data.crm_id);
+  } catch(e) {
+    // No interrumpir el flujo del usuario si el CRM falla
+    console.warn("[CRM] No se pudo conectar:", e.message);
+  }
+}
+
+// Solicitar informe Clearing al backend
+// TODO IT: El backend recibe esto, solicita el informe a Clearing de Informes,
+// lo interpreta con IA y devuelve el resultado al cliente por email o en el dashboard.
+async function solicitarClearing(tipo) {
+  // tipo: "puntual" (pago único) | "seguimiento" (cada 30 días)
+  const payload = {
+    user: { nombre:PRE.nombre, cedula:PRE.cedula, email:PRE.email, telefono:PRE.telefono },
+    tipo_servicio: tipo,
+    plan_reset: diag ? { score:diag.scoreReset, nivel:diag.nivelR, plan_id:diag.planId } : null,
+    timestamp: new Date().toISOString(),
+  };
+  try {
+    const res = await fetch(RESET_CLEARING_URL, {
+      method: "POST",
+      headers: { "Content-Type":"application/json", "X-Reset-Token":RESET_API_TOKEN },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    return data;
+  } catch(e) {
+    console.warn("[CLEARING] Error:", e.message);
+    return { ok:false, error:e.message };
+  }
+}
+
+// Solicitar análisis IA al backend (en lugar de llamar a Anthropic directamente)
+// TODO IT: El backend recibe el payload, llama a Anthropic con la clave segura,
+// y devuelve el resultado. Nunca exponer la API key en el frontend en producción.
+async function requestAIAnalysisFromBackend(motor) {
+  // TODO IT: Implementar POST /api/reset/ai-analysis
+  // Por ahora llama directamente a Anthropic (solo para desarrollo)
+  return await llamarClaude(motor);
+}
 
 // =============================================================================
-// CLAUDE API
+// CLAUDE API — SOLO PARA DESARROLLO
+// TODO IT: Mover a backend. Ver requestAIAnalysisFromBackend arriba.
 // =============================================================================
 async function llamarClaude(motor) {
   const ak = get_api_key();
-  if(!ak){ iaError="No hay clave API configurada. Ingresala en localStorage con la clave cr_api_key."; renderTab(); return; }
+  if(!ak || ak==="sk-ant-REEMPLAZAR"){
+    iaError="Análisis IA no disponible. Configurar clave API.";
+    renderTab();
+    return;
+  }
   iaLoading=true; iaError=null; iaResult=null; renderTab();
-  const d = motor;
   const prompt = `Actúa como asesor financiero de Credizona Reset para Uruguay. Tono: claro, humano, directo, sin juzgar. Español rioplatense. No prometas aprobación de crédito.
 
 USUARIO: ${PRE.nombre} | Ingreso: ${fmt(PRE.ingresoMensual)} | Laboral: ${PRE.situacionLaboral}
-RESET: Score ${d.scoreReset}/100 | Nivel ${d.nivelR} | Plan: ${d.plan.titulo}
-ENCUESTA: Score ${d.enc.score}/100 | Nivel ${d.enc.nivel} | B+: ${d.enc.bPlus}
-FINANCIERO: Gastos ${fmt(d.fin.totalGastos)} | Deuda ${fmt(d.fin.totalDeuda)} | Flujo libre ${fmt(d.fin.flujoLibre)} | Ratio ${Math.round(d.fin.ratio*100)}% | Moras: ${d.fin.cantMoras}
-PLAN: ${d.plan.titulo} — ${d.plan.objetivo}
-P1: ${d.plan.prioridades[0]}
-P2: ${d.plan.prioridades[1]}
-P3: ${d.plan.prioridades[2]}
+RESET: Score ${motor.scoreReset}/100 | Nivel ${motor.nivelR} | Plan: ${motor.plan.titulo}
+ENCUESTA: Score ${motor.enc.score}/100 | Nivel ${motor.enc.nivel} | B+: ${motor.enc.bPlus}
+FINANCIERO: Gastos ${fmt(motor.fin.totalGastos)} | Deuda ${fmt(motor.fin.totalDeuda)} | Flujo libre ${fmt(motor.fin.flujoLibre)} | Ratio ${Math.round(motor.fin.ratio*100)}% | Moras: ${motor.fin.cantMoras}
+PLAN: ${motor.plan.titulo} — ${motor.plan.objetivo}
+P1: ${motor.plan.prioridades[0]}
+P2: ${motor.plan.prioridades[1]}
+P3: ${motor.plan.prioridades[2]}
 
 Responde SOLO con JSON válido sin markdown:
 {"diagnostico":"2-3 oraciones directas.","plan":"Explicación del plan y por qué aplica.","prioridades":["acción 1","acción 2","acción 3"],"primerPaso":"Una acción concreta para hacer esta semana.","mensaje":"Frase motivadora y realista. Directa."}`;
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":ak,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:600,messages:[{role:"user",content:prompt}]})});
+    const res = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","x-api-key":ak,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+      body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:600,messages:[{role:"user",content:prompt}]})
+    });
     if(!res.ok){const e=await res.json();throw new Error(e.error?.message||"Error "+res.status);}
     const data = await res.json();
     iaResult = JSON.parse((data.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim());
-    guardar();
+    guardarEnCRM(diag, "reset_prompt_generated");
   } catch(e){ iaError=e.message||"Error al conectar con Claude"; }
   iaLoading=false; renderTab();
-}
-
-async function guardarEnCRM(motor) {
-  const payload = { user:{nombre:PRE.nombre,cedula:PRE.cedula,email:PRE.email,ingreso:PRE.ingresoMensual,laboral:PRE.situacionLaboral,monto_solicitado:PRE.montoSolicitado,motivo_rechazo:PRE.motivoRechazo,canal:PRE.canal},
-    encuesta:{score:motor.enc.score,nivel:motor.enc.nivel,b_plus:motor.enc.bPlus,flags:motor.enc.flagsRiesgo},
-    financiero:{total_gastos:motor.fin.totalGastos,total_deuda:motor.fin.totalDeuda,flujo_libre:motor.fin.flujoLibre,ratio:motor.fin.ratio,moras:motor.fin.cantMoras,score_financiero:motor.fin.scoreFinanciero},
-    reset:{score:motor.scoreReset,nivel:motor.nivelR,plan_id:motor.planId,plan:motor.plan.titulo},
-    ia_resultado:iaResult||null, algorithm_version:ALGORITHM_VERSION, timestamp:new Date().toISOString()};
-  try { await fetch(RESET_API_URL,{method:"POST",headers:{"Content-Type":"application/json","X-Reset-Token":RESET_API_TOKEN},body:JSON.stringify(payload)}); } catch(e){ console.warn("[CRM]",e.message); }
 }
 
 // =============================================================================
@@ -735,7 +945,7 @@ function next() {
     saldoInicial = deudas.reduce((s,d)=>s+(parseFloat(d.balance)||0),0);
     snapshot = {fecha_inicio:new Date().toISOString(),score_reset:diag.scoreReset,nivel:diag.nivelR,plan_id:diag.planId,saldo_inicial:saldoInicial,flujo_inicial:diag.fin.flujoLibre};
     guardar(); trackEvent("reset_plan_generated",{plan:diag.planId,score:diag.scoreReset});
-    guardarEnCRM(diag);
+    guardarEnCRM(diag, 'reset_plan_generated');
     step=2; activeTab="plan"; render(); return;
   }
   if(step===2){ switchTab(activeTab); }
@@ -797,6 +1007,7 @@ function updateHeader() {
     }
   } else {
     lbl.classList.remove("hidden");
+    lbl.textContent = SEGMENTO===3 ? "Diagnóstico financiero" : "Diagnóstico post-rechazo";
     btnN.classList.add("hidden");
     day.classList.add("hidden");
     saved.classList.add("hidden");
@@ -807,24 +1018,37 @@ function updateSticky() {
   const bar = document.getElementById("sticky-bar");
   const cta = document.getElementById("sticky-cta");
   const txt = document.getElementById("sticky-step-txt");
-  if(step===0){ txt.textContent="Completá tus gastos para continuar"; cta.textContent="Continuar"; cta.onclick=next; bar.style.display=""; }
+  if(step===0){ txt.textContent=SEGMENTO_CFG[SEGMENTO].kicker; cta.textContent=SEGMENTO_CFG[SEGMENTO].cta.replace(" →",""); cta.onclick=next; bar.style.display=""; }
   else if(step===1){ txt.textContent="Cargá tus deudas y generá tu plan"; cta.textContent="Ver mi plan Reset"; cta.onclick=next; bar.style.display=""; }
-  else if(step===2){ txt.textContent=diag?.plan?.cta||"Revisá tu plan de acción"; cta.textContent="Ver análisis IA →"; cta.onclick=()=>switchTab("ia"); bar.style.display=""; }
+  else if(step===2){
+    const urgente = diag && (diag.nivelR==="C" || diag.fin?.cantMoras>0);
+    txt.textContent = diag?.plan?.cta||"Revisá tu plan de acción";
+    cta.textContent = urgente ? "⚠️ Ver Reset Plus" : "⭐ Reset Plus";
+    cta.style.background = urgente ? "linear-gradient(90deg,#ff7538,#dc2626)" : "linear-gradient(90deg,#ffd447,#f59e0b)";
+    cta.style.color = "#1a1000";
+    cta.onclick = abrirPremium;
+    bar.style.display="";
+  }
 }
 
 // =============================================================================
 // STEP 0 — GASTOS
 // =============================================================================
 function renderStep0() {
+  const cfg = SEGMENTO_CFG[SEGMENTO];
   const enc = calcularScoreEncuesta(PRE.respuestas);
-  const hasEnc = Object.values(PRE.respuestas).some(v=>v!==null);
-  const col = nivelColor(enc.nivel);
   const total = Object.values(gastos).reduce((s,v)=>s+(parseFloat(v)||0),0);
+  const ingreso = PRE.ingresoMensual;
+  const col = nivelColor(enc.nivel);
+
+  // Preview conductual para Segmento 1
+  const preview = SEGMENTO===1 ? renderPreviewConductual(enc) : "";
+
   return `
   <div class="fade">
     ${renderStepNav(0)}
 
-    <!-- HERO -->
+    <!-- HERO adaptado al segmento -->
     <div class="card-green" style="margin-bottom:20px;">
       <div class="hero-wrap">
         <div class="hero-glow1"></div><div class="hero-glow2"></div>
@@ -833,43 +1057,74 @@ function renderStep0() {
           <div class="hero-logo-sep"></div>
           <span class="hero-logo-tag">RESET</span>
         </div>
-        <h1 class="hero-h1" style="position:relative;z-index:1;">ENTENDÉ DÓNDE ESTÁS.<br><span>SABÉ CÓMO SALIR.</span></h1>
-        <p class="hero-sub" style="position:relative;z-index:1;">Cargá tus gastos y deudas en 5 minutos. El sistema analiza tu situación real con IA y te dice exactamente qué hacer primero.</p>
-        <div class="hero-steps" style="position:relative;z-index:1;">
+
+        <!-- Kicker -->
+        <div style="margin-bottom:16px;position:relative;z-index:1;">
+          <div class="kicker" style="display:inline-flex;">
+            <span class="kicker-dot"></span>
+            ${cfg.kicker}
+          </div>
+        </div>
+
+        <!-- Headline -->
+        <h1 class="hero-h1" style="position:relative;z-index:1;">
+          ${cfg.h1}<br><span>${cfg.h1green}</span>
+        </h1>
+        <p class="hero-sub" style="position:relative;z-index:1;">${cfg.sub}</p>
+
+        <!-- Datos precargados (seg 1 y 2) -->
+        ${SEGMENTO<=2 && PRE.nombre ? `
+        <div style="position:relative;z-index:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;gap:12px;">
+          <div style="width:36px;height:36px;border-radius:50%;background:rgba(92,255,112,.15);border:1.5px solid rgba(92,255,112,.4);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">👋</div>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#f7fbff;">${PRE.nombre}</div>
+            <div style="font-size:12px;color:#a9b4cc;">Ingreso declarado: ${fmt(PRE.ingresoMensual)} · ${SITUACION_LABELS[PRE.situacionLaboral]||PRE.situacionLaboral}</div>
+          </div>
+        </div>` : ""}
+
+        <!-- Preview conductual Seg 1 -->
+        ${preview}
+
+        <!-- Pasos (seg 2 y 3) -->
+        ${SEGMENTO>=2 ? `
+        <div class="hero-steps" style="position:relative;z-index:1;margin-bottom:20px;">
           ${[["1","Cargás tus datos"],["2","El sistema analiza"],["3","Recibís tu plan"]].map(([n,t],i)=>`
             <div class="hero-step"><div class="hero-step-num">${n}</div><span class="hero-step-txt">${t}</span></div>
             ${i<2?'<span class="hero-step-arr">›</span>':""}`).join("")}
-        </div>
+        </div>` : ""}
+
+        <!-- Badges -->
         <div class="hero-badges" style="position:relative;z-index:1;">
-          <div class="free-badge"><span>🆓</span><span>100% GRATIS</span></div>
+          <div class="free-badge"><span>🆓</span><span>Diagnóstico inicial gratis</span></div>
           <span class="secure-txt">🔒 Tus datos son privados</span>
         </div>
       </div>
+
+      <!-- Pain points (seg 2 y 3) -->
+      ${SEGMENTO>=2 ? `
       <div class="pain-grid" style="padding:0 20px 20px;">
         ${[["😞","Pagás pero no salís de las deudas"],["✕","Te rechazan y no te explican por qué"],["🔍","No entendés qué dice tu perfil crediticio"],["📋","Nunca tuviste un plan claro para salir"]].map(([ic,t])=>`
           <div class="pain-item"><span class="pain-icon">${ic}</span><span class="pain-txt">${t}</span></div>`).join("")}
-      </div>
+      </div>` : ""}
     </div>
 
-    <!-- ENCUESTA BANNER -->
-    ${hasEnc?`<div class="enc-banner" style="background:${col}12;border:1px solid ${col}30;">
-      <span style="font-size:10px;font-weight:900;color:${col};font-family:Inter,sans-serif;letter-spacing:.05em;">ENCUESTA: NIVEL ${enc.nivel} — ${enc.score}/100</span>
-      ${enc.bPlus?'<span style="font-size:9px;font-weight:900;color:#9B72F0;background:rgba(155,114,240,.12);border:1px solid rgba(155,114,240,.35);border-radius:5px;padding:2px 8px;text-transform:uppercase;">B+</span>':""}
-      ${enc.flagsRiesgo.length>0?`<span style="font-size:10px;color:#a9b4cc;">${enc.flagsRiesgo.length} flag(s) de riesgo</span>`:""}
-    </div>`:""}
-
-    <!-- DATOS PRECARGADOS -->
+    <!-- Datos precargados (card separado, seg 1 y 2) -->
+    ${SEGMENTO<=2 ? `
     <div class="card-green" style="padding:20px 22px;margin-bottom:20px;">
       <div class="lbl" style="color:#5cff70;margin-bottom:14px;">📋 DATOS DE TU SOLICITUD</div>
       <div class="readonly-grid">
-        ${[["Nombre",PRE.nombre],["Cédula",PRE.cedula],["Email",PRE.email],["Ingreso mensual",fmt(PRE.ingresoMensual)],["Situación laboral",SITUACION_LABELS[PRE.situacionLaboral]||PRE.situacionLaboral],["Motivo de rechazo",MOTIVO_LABELS[PRE.motivoRechazo]||PRE.motivoRechazo]].map(([l,v])=>`
+        ${[["Nombre",PRE.nombre],["Cédula",PRE.cedula],["Email",PRE.email],["Ingreso mensual",fmt(PRE.ingresoMensual)],["Situación laboral",SITUACION_LABELS[PRE.situacionLaboral]||PRE.situacionLaboral],["Monto solicitado",fmt(PRE.montoSolicitado)]].filter(([,v])=>v&&v!=="$0").map(([l,v])=>`
           <div class="readonly-item"><span class="lbl">${l}</span><div class="readonly-val">${v}</div></div>`).join("")}
       </div>
-    </div>
+    </div>` : ""}
 
-    <!-- GASTOS -->
-    <h2 style="font-size:22px;font-family:Inter,sans-serif;font-weight:900;text-transform:uppercase;letter-spacing:-.04em;color:#f7fbff;margin-bottom:6px;">¿Cuánto gastás por mes?</h2>
-    <p style="font-size:13px;color:#a9b4cc;margin-bottom:20px;line-height:1.65;">Completá tus gastos fijos. La precisión define la calidad del plan.</p>
+    <!-- Formulario gastos -->
+    <h2 style="font-size:20px;font-family:Inter,sans-serif;font-weight:900;text-transform:uppercase;letter-spacing:-.03em;color:#f7fbff;margin-bottom:6px;">
+      ${SEGMENTO===1 ? "Ahora completá tus gastos para afinar el diagnóstico" : "¿Cuánto gastás por mes?"}
+    </h2>
+    <p style="font-size:13px;color:#a9b4cc;margin-bottom:20px;line-height:1.65;">
+      ${SEGMENTO===1 ? "Cuantos más datos cargues, más preciso es el plan que recibís." : "Completá tus gastos fijos. La precisión define la calidad del plan."}
+    </p>
 
     <div class="card-strong" style="padding:20px 22px 6px;margin-bottom:14px;">
       ${EXPENSE_CATS.map(c=>`
@@ -885,11 +1140,62 @@ function renderStep0() {
 
     <div class="total-bar" id="total-bar" style="${total===0?'display:none':''}">
       <span class="total-lbl">Total gastos ingresados</span>
-      <span class="total-val" id="total-val" style="color:${total>PRE.ingresoMensual*.9?'#ff7538':total>PRE.ingresoMensual*.7?'#ffd447':'#5cff70'}">${fmt(total)}</span>
+      <span class="total-val" id="total-val" style="color:${total>ingreso*.9?'#ff7538':total>ingreso*.7?'#ffd447':'#5cff70'}">${fmt(total)}</span>
     </div>
 
   </div>`;
 }
+
+// Preview conductual para Segmento 1
+function renderPreviewConductual(enc) {
+  const col = nivelColor(enc.nivel);
+  const nivelTexto = enc.nivel==="A"?"Muy buena disposición al cambio":enc.nivel==="B+"?"Buena actitud, con señales de presión":enc.nivel==="B"?"Situación manejable, requiere trabajo":"Señales de alerta importantes";
+  const nivelSimple = enc.nivel==="A"||enc.nivel==="B+"?"MUY BIEN":enc.nivel==="B"?"EN PROCESO":"REQUIERE ATENCIÓN";
+
+  // Key insights from survey answers
+  const resp = PRE.respuestas;
+  const insights = [];
+  if(resp.p1==="A"||resp.p1==="B") insights.push({icon:"✓",txt:"Tenés claridad sobre tus ingresos y gastos",c:"#5cff70"});
+  else insights.push({icon:"→",txt:"No tenés claro cuánto entra y sale cada mes",c:"#ffd447"});
+  if(resp.p8==="A") insights.push({icon:"✓",txt:"Ya tomaste acciones para mejorar — eso cuenta",c:"#5cff70"});
+  if(resp.p6==="D") insights.push({icon:"⚠",txt:"Tenés préstamos informales activos",c:"#ff7538"});
+  if(resp.p10==="A"||resp.p10==="B") insights.push({icon:"✓",txt:"Sos constante con los hábitos financieros positivos",c:"#5cff70"});
+  else if(resp.p10==="D") insights.push({icon:"→",txt:"La constancia es tu punto más débil declarado",c:"#ffd447"});
+
+  return `
+  <div style="position:relative;z-index:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:16px 18px;margin-bottom:18px;">
+    <div style="font-size:10px;color:#a9b4cc;text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;font-weight:700;">PRIMERA LECTURA — basada en tu encuesta</div>
+
+    <!-- Nivel conductual -->
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.08);">
+      <div style="text-align:center;flex-shrink:0;">
+        <div style="font-size:32px;font-weight:900;color:${col};font-family:'DM Serif Display',serif;line-height:1;">${enc.score}</div>
+        <div style="font-size:9px;color:#a9b4cc;margin-top:1px;">de 100</div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:900;color:${col};background:${col}18;border:1px solid ${col}35;border-radius:20px;padding:3px 12px;display:inline-block;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">${nivelSimple}</div>
+        <div style="font-size:13px;color:#f7fbff;font-weight:600;">${nivelTexto}</div>
+        <div style="font-size:11px;color:#a9b4cc;margin-top:2px;">Basado en tu encuesta conductual</div>
+      </div>
+    </div>
+
+    <!-- Insights clave -->
+    <div style="display:grid;gap:7px;margin-bottom:12px;">
+      ${insights.slice(0,3).map(ins=>`
+      <div style="display:flex;align-items:flex-start;gap:8px;">
+        <span style="font-size:12px;color:${ins.c};font-weight:900;flex-shrink:0;margin-top:1px;">${ins.icon}</span>
+        <span style="font-size:12px;color:#a9b4cc;line-height:1.5;">${ins.txt}</span>
+      </div>`).join("")}
+    </div>
+
+    <!-- Precisión y disclaimer -->
+    <div style="background:rgba(255,212,71,.08);border:1px solid rgba(255,212,71,.2);border-radius:8px;padding:10px 12px;">
+      <div style="font-size:11px;color:#ffd447;font-weight:700;margin-bottom:3px;">⚡ Precisión actual: MEDIA</div>
+      <div style="font-size:11px;color:#a9b4cc;line-height:1.5;">Calculado solo con tu encuesta. Cargá gastos y deudas para obtener el diagnóstico completo.</div>
+    </div>
+  </div>`;
+}
+
 
 function actualizarTotal() {
   const total = Object.values(gastos).reduce((s,v)=>s+(parseFloat(v)||0),0);
@@ -961,21 +1267,26 @@ function eliminarDeuda(i){ if(deudas.length>1){deudas.splice(i,1); const c=docum
 // NAV SHARED
 // =============================================================================
 function renderStepNav(cur) {
-  return `<div class="steps-nav">
-    ${["Gastos fijos","Tus deudas"].map((s,i)=>`
-      <div class="step-pill">
-        <div class="num ${i<cur?"done":i===cur?"active":""}">${i<cur?"✓":i+1}</div>
-        <span class="name ${i===cur?"active":""}">${s}</span>
-      </div>
-      ${i<1?'<div class="step-divider"></div>':""}`).join("")}
-  </div>`;
+  const steps = ["Gastos fijos","Tus deudas"];
+  let html = '<div class="steps-nav">';
+  steps.forEach(function(s,i) {
+    const numCls = i<cur?"done":i===cur?"active":"";
+    const nameCls = i===cur?"active":"";
+    const numTxt = i<cur?"&#10003;":(i+1);
+    html += '<div class="step-pill">';
+    html += '<div class="num '+numCls+'">'+numTxt+'</div>';
+    html += '<span class="name '+nameCls+'">'+s+'</span>';
+    html += '</div>';
+    if(i<1) html += '<div class="step-divider"></div>';
+  });
+  html += '</div>';
+  return html;
 }
 
 function renderNavButtons(cur) {
-  return `<div class="nav-actions">
-    ${cur>0?`<button class="btn-secondary" onclick="prev()">← Atrás</button>`:`<div></div>`}
-    <button class="btn-primary" onclick="next()">${cur===1?"Ver mi plan Reset →":"Continuar →"}</button>
-  </div>`;
+  const backBtn = cur>0 ? '<button class="btn-secondary" onclick="prev()">&#8592; Atras</button>' : '<div></div>';
+  const fwdTxt = cur===1 ? "Ver mi plan Reset" : "Continuar";
+  return '<div class="nav-actions">' + backBtn + '<button class="btn-primary" onclick="next()">' + fwdTxt + ' &rarr;</button></div>';
 }
 
 // =============================================================================
@@ -1022,6 +1333,124 @@ function renderTab() {
   if(activeTab==="crono")  bindCronoTab();
   if(activeTab==="sim")    bindSimTab();
   if(activeTab==="ia")     bindIATab();
+}
+
+// =============================================================================
+// PREMIUM OFFER — Reset Plus (puntual) y Reset Seguimiento (ongoing 30/60/90 días)
+// =============================================================================
+let premiumModalOpen = false;
+
+function abrirPremium() {
+  premiumModalOpen = true;
+  const existing = document.getElementById("modal-premium");
+  if(existing) existing.remove();
+  const el = document.createElement("div");
+  el.id = "modal-premium";
+  el.innerHTML = renderPremiumModal();
+  document.body.appendChild(el);
+}
+
+function cerrarPremium() {
+  premiumModalOpen = false;
+  const el = document.getElementById("modal-premium");
+  if(el) el.remove();
+}
+
+function renderPremiumModal() {
+  const nc = diag ? nivelColor(diag.nivelR) : "#5cff70";
+  const urgente = diag && (diag.nivelR==="C" || diag.fin.cantMoras>0);
+
+  return `<div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:200;display:flex;align-items:flex-end;justify-content:center;padding:0;" onclick="if(event.target===this)cerrarPremium()">
+  <div style="background:#0b1630;border:1px solid rgba(255,255,255,.1);border-radius:20px 20px 0 0;padding:28px 22px 40px;max-width:520px;width:100%;max-height:92vh;overflow-y:auto;" class="fade">
+
+    <!-- Handle -->
+    <div style="width:40px;height:4px;background:rgba(255,255,255,.15);border-radius:2px;margin:0 auto 24px;"></div>
+
+    <!-- Header -->
+    <div style="text-align:center;margin-bottom:22px;">
+      ${urgente?`<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,117,56,.12);border:1px solid rgba(255,117,56,.3);border-radius:20px;padding:5px 14px;font-size:11px;font-weight:900;color:#ff7538;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">⚠️ Recomendado para tu situación</div>`:`<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,212,71,.1);border:1px solid rgba(255,212,71,.3);border-radius:20px;padding:5px 14px;font-size:11px;font-weight:900;color:#ffd447;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">⭐ Siguiente nivel</div>`}
+      <h2 style="font-size:22px;font-weight:900;color:#f7fbff;font-family:'DM Serif Display',serif;line-height:1.15;margin-bottom:10px;">
+        Entendé exactamente<br/>qué ve el banco sobre vos.
+      </h2>
+      <p style="font-size:14px;color:#a9b4cc;line-height:1.65;max-width:380px;margin:0 auto;">
+        Tu diagnóstico actual está basado en lo que vos declaraste. El Reset Plus cruza eso con los datos reales que tiene registrados el sistema financiero sobre vos.
+      </p>
+    </div>
+
+    <!-- Lo que recibís -->
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:18px;margin-bottom:16px;">
+      <div style="font-size:10px;color:#a9b4cc;text-transform:uppercase;letter-spacing:.07em;font-weight:700;margin-bottom:14px;">LO QUE VAS A RECIBIR</div>
+      ${[
+        ["🔍","Tu historial real en el sistema financiero","Vemos exactamente qué deudas, atrasos y consultas tiene registradas el banco sobre vos"],
+        ["🎯","Por qué te rechazaron, en simple","No la razón genérica — la causa real y concreta en tu caso"],
+        ["🤖","Análisis con inteligencia artificial","La IA cruza tu diagnóstico con tu historial real y te dice qué corregir primero y en qué orden"],
+        ["📋","Plan de 30 días personalizado","Basado en datos reales, no en estimaciones. Con pasos concretos para cada semana"],
+        ["✓","Verificación de errores en tu historial","Si hay algo mal registrado, te lo decimos. Eso solo puede cambiar todo"],
+      ].map(([ic,t,d])=>`
+      <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06);">
+        <span style="font-size:18px;flex-shrink:0;">${ic}</span>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#f7fbff;margin-bottom:2px;">${t}</div>
+          <div style="font-size:12px;color:#7a8aaa;line-height:1.5;">${d}</div>
+        </div>
+      </div>`).join("")}
+    </div>
+
+    <!-- Dos opciones de precio -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+
+      <!-- Puntual -->
+      <div style="background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.12);border-radius:14px;padding:16px;text-align:center;cursor:pointer;" onclick="iniciarPago('puntual')"
+        onmouseover="this.style.borderColor='rgba(255,255,255,.3)'" onmouseout="this.style.borderColor='rgba(255,255,255,.12)'">
+        <div style="font-size:10px;color:#a9b4cc;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Una vez</div>
+        <div style="font-size:28px;font-weight:900;color:#f7fbff;font-family:'DM Serif Display',serif;line-height:1;">990</div>
+        <div style="font-size:11px;color:#a9b4cc;margin-bottom:10px;">UYU · pago único</div>
+        <div style="font-size:11px;color:#7a8aaa;line-height:1.5;">Diagnóstico completo ahora. Sin compromiso.</div>
+      </div>
+
+      <!-- Seguimiento -->
+      <div style="background:linear-gradient(160deg,rgba(92,255,112,.08),rgba(75,142,240,.05));border:2px solid rgba(92,255,112,.35);border-radius:14px;padding:16px;text-align:center;cursor:pointer;position:relative;" onclick="iniciarPago('seguimiento')"
+        onmouseover="this.style.borderColor='rgba(92,255,112,.6)'" onmouseout="this.style.borderColor='rgba(92,255,112,.35)'">
+        <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:#5cff70;color:#041008;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;padding:3px 10px;border-radius:20px;white-space:nowrap;">Recomendado</div>
+        <div style="font-size:10px;color:#5cff70;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Seguimiento</div>
+        <div style="font-size:28px;font-weight:900;color:#5cff70;font-family:'DM Serif Display',serif;line-height:1;">490</div>
+        <div style="font-size:11px;color:#a9b4cc;margin-bottom:10px;">UYU / mes · días 0/30/60</div>
+        <div style="font-size:11px;color:#7a8aaa;line-height:1.5;">Informe cada 30 días. Alerta cuando mejora tu perfil.</div>
+      </div>
+    </div>
+
+    <!-- Diferencia entre los dos -->
+    <div style="background:rgba(255,212,71,.06);border:1px solid rgba(255,212,71,.2);border-radius:10px;padding:12px 14px;margin-bottom:16px;">
+      <div style="font-size:12px;color:#ffd447;font-weight:700;margin-bottom:4px;">¿Cuál elegir?</div>
+      <div style="font-size:12px;color:#a9b4cc;line-height:1.6;">El <strong style="color:#f7fbff;">pago único</strong> es para entender tu situación ahora y tener un plan. El <strong style="color:#5cff70;">seguimiento</strong> actualiza tu informe cada 30 días y te avisa exactamente cuándo tu perfil está listo para volver a pedir el crédito.</div>
+    </div>
+
+    <!-- Garantía -->
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="font-size:12px;color:#7a8aaa;">🛡️ Si en 7 días no te ayudó, te devolvemos el dinero.</div>
+    </div>
+
+    <!-- Disclaimer -->
+    <div style="font-size:10px;color:#566070;text-align:center;line-height:1.6;margin-bottom:14px;">
+      El informe Clearing es provisto por Clearing de Informes Uruguay. Credizona Reset interpreta el informe y genera recomendaciones. No garantizamos aprobación futura de créditos.
+    </div>
+
+    <button onclick="cerrarPremium()" style="width:100%;background:none;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:11px;font-size:13px;color:#7a8aaa;cursor:pointer;font-family:inherit;font-weight:600;">Ahora no</button>
+  </div>
+</div>`;
+}
+
+function iniciarPago(tipo) {
+  // TODO IT: Integrar pasarela de pago (MercadoPago / Stripe / RedPagos)
+  // tipo: "puntual" | "seguimiento"
+  // Al completar el pago:
+  //   1. Llamar a solicitarClearing(tipo)
+  //   2. Guardar en CRM: guardarEnCRM(diag, "reset_plus_purchased", {tipo_pago:tipo})
+  //   3. Mostrar confirmación al usuario
+  //   4. Si tipo==="seguimiento", programar recordatorios día 30/60
+  trackEvent("reset_plus_initiated", {tipo, plan:diag?.planId, score:diag?.scoreReset});
+  cerrarPremium();
+  alert("Redirigiendo al pago... (TODO: integrar pasarela de pago)");
 }
 
 // =============================================================================
@@ -1132,10 +1561,15 @@ function renderTabPlan() {
       ${d.alertas.map(a=>`<p>· ${a}</p>`).join("")}
     </div>`:""}
 
-    <!-- CTA IA -->
-    <div style="background:${pc}08;border:1px solid ${pc}25;border-radius:14px;padding:18px 20px;text-align:center;">
-      <p style="font-size:13px;color:#a9b4cc;line-height:1.6;margin-bottom:14px;">${plan.cta}</p>
-      <button class="btn-primary" onclick="switchTab('ia')">Ver análisis IA personalizado →</button>
+    <!-- CTA Premium — siempre visible al final del plan -->
+    <div style="background:linear-gradient(160deg,rgba(255,212,71,.06),rgba(92,255,112,.04));border:2px solid rgba(255,212,71,.3);border-radius:16px;padding:20px;margin-top:4px;">
+      <div style="font-size:10px;color:#ffd447;font-weight:900;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">⭐ SIGUIENTE PASO</div>
+      <div style="font-size:16px;font-weight:700;color:#f7fbff;font-family:'DM Serif Display',serif;margin-bottom:6px;">¿Qué ve el banco exactamente sobre vos?</div>
+      <p style="font-size:13px;color:#a9b4cc;line-height:1.6;margin-bottom:14px;">Este diagnóstico es con los datos que vos declaraste. El Reset Plus cruza eso con tu historial real en el sistema financiero — y te dice qué corregir primero.</p>
+      <button class="btn-primary" style="width:100%;background:linear-gradient(90deg,#ffd447,#f59e0b);color:#1a1000;" onclick="abrirPremium()">
+        Ver qué ve el banco sobre mí →
+      </button>
+      <div style="text-align:center;margin-top:8px;font-size:11px;color:#7a8aaa;">Desde UYU 490/mes · Garantía 7 días</div>
     </div>
   </div>`;
 }
@@ -1499,32 +1933,14 @@ function renderTabPerfil() {
       </div>`;
     }).join("")}
 
-    <!-- CLEARING BLOQUEADO -->
-    <div style="position:relative;margin-top:8px;">
-      <div class="card" style="padding:20px;border:2px dashed rgba(255,212,71,.3);background:rgba(255,212,71,.04);filter:blur(0);">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-          <div style="width:40px;height:40px;border-radius:10px;background:rgba(255,212,71,.15);border:1.5px solid rgba(255,212,71,.4);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🔒</div>
-          <div>
-            <div style="font-size:14px;font-weight:700;color:#f7fbff;font-family:'DM Serif Display',serif;">Informe Clearing de Informes</div>
-            <div style="font-size:12px;color:#a9b4cc;margin-top:2px;">Ver exactamente qué deudas tiene reportadas el banco sobre vos</div>
-          </div>
-          <div style="margin-left:auto;text-align:right;flex-shrink:0;">
-            <div style="font-size:10px;color:#a9b4cc;margin-bottom:2px;">Precio</div>
-            <div style="font-size:18px;font-weight:900;color:#ffd447;font-family:'DM Serif Display',serif;">UYU 990</div>
-          </div>
-        </div>
-        <div style="display:grid;gap:8px;margin-bottom:16px;">
-          ${["Ver todas tus deudas reportadas en el sistema financiero","Entender exactamente por qué te rechazaron","Descubrir si hay errores en tu historial que podés corregir","Saber qué deudas negociar primero para mejorar tu perfil"].map(b=>`
-          <div style="display:flex;gap:8px;align-items:flex-start;">
-            <span style="color:#ffd447;font-weight:900;flex-shrink:0;">✓</span>
-            <span style="font-size:13px;color:#a9b4cc;">${b}</span>
-          </div>`).join("")}
-        </div>
-        <button onclick="alert('Próximamente — sistema de pago en proceso de integración.')" style="width:100%;background:linear-gradient(90deg,#ffd447,#f59e0b);border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:900;color:#1a1000;cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:.02em;">
-          Obtener mi informe Clearing →
-        </button>
-        <p style="font-size:11px;color:#7a8aaa;text-align:center;margin-top:8px;">Pago único · Sin suscripción · Resultado en 24 horas</p>
-      </div>
+    <!-- RESET PLUS CTA en perfil crediticio -->
+    <div style="background:linear-gradient(160deg,rgba(255,212,71,.06),rgba(92,255,112,.04));border:2px solid rgba(255,212,71,.25);border-radius:14px;padding:18px;margin-top:8px;">
+      <div style="font-size:11px;color:#ffd447;font-weight:800;margin-bottom:6px;">¿Y qué tiene registrado el banco sobre vos?</div>
+      <p style="font-size:13px;color:#a9b4cc;line-height:1.6;margin-bottom:14px;">Este análisis es con los datos que vos declaraste. El Reset Plus accede a tu historial real y te dice si hay algo que no sabías — errores, deudas olvidadas, consultas que te están pesando.</p>
+      <button class="btn-primary" style="width:100%;background:linear-gradient(90deg,#ffd447,#f59e0b);color:#1a1000;" onclick="abrirPremium()">
+        Ver qué ve el banco sobre mí →
+      </button>
+      <div style="text-align:center;margin-top:8px;font-size:11px;color:#7a8aaa;">Desde UYU 490/mes · Garantía 7 días</div>
     </div>
   </div>`;
 }
